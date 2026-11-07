@@ -117,7 +117,8 @@
   margin-top: 10px;
 }
 
-.jv-agent {
+.jv-agent,
+.jv-voice {
   min-height: 34px;
   min-width: 0;
   max-width: 100%;
@@ -172,6 +173,11 @@
   align-items: flex-start;
   gap: 8px;
   margin-top: 8px;
+}
+
+.jv-check .jv-voice {
+  align-self: center;
+  font-size: 16px;
 }
 
 .jv-note {

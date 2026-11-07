@@ -451,3 +451,37 @@ test("only the owner can turn memory on, and only on a machine that offers it", 
   assert.equal((await post(owner, "/api/agents/memo/memory", { enabled: false })).status, 200);
   assert.equal((await connector.next("agent")).memoryOn, false);
 });
+
+test("natural speech is proxied to the local voice service only for invited people", async () => {
+  const seen: string[] = [];
+  const service = createServer(async (req, res) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(chunk as Buffer);
+    seen.push(`${req.method} ${req.url} ${Buffer.concat(chunks).toString()}`);
+    if (req.url === "/voices") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ voices: ["af_heart"], default: "af_heart" }));
+      return;
+    }
+    res.writeHead(200, { "content-type": "audio/wav" });
+    res.end(Buffer.from("RIFFfake"));
+  });
+  await new Promise<void>((resolve) => service.listen(0, "127.0.0.1", resolve));
+  assert.equal((await post(owner, "/api/tts", { text: "hi" })).status, 503);
+  process.env.ROOM_TTS_URL = `http://127.0.0.1:${(service.address() as AddressInfo).port}`;
+  try {
+    assert.equal((await post("wrong", "/api/tts", { text: "hi" })).status, 401);
+    assert.equal((await post(owner, "/api/tts", { text: "  " })).status, 400);
+    const res = await post(owner, "/api/tts", { text: "hello there", voice: "af_heart" });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("content-type"), "audio/wav");
+    assert.equal(Buffer.from(await res.arrayBuffer()).toString(), "RIFFfake");
+    const voices = await fetch(`${base}/api/tts/voices`, { headers: { authorization: `Bearer ${owner}` } });
+    assert.deepEqual(await voices.json(), { available: true, voices: ["af_heart"], default: "af_heart" });
+    assert.ok(seen.some((line) => line.includes('"text":"hello there"')));
+  } finally {
+    delete process.env.ROOM_TTS_URL;
+    service.closeAllConnections();
+    await new Promise((resolve) => service.close(resolve));
+  }
+});

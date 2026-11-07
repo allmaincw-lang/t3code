@@ -13,7 +13,7 @@ function init() {
   const KEY = "room-jarvis";
   const MAX_SPOKEN = 700;
   const MAX_HOLD_MS = 60_000;
-  const prefs = { agent: "", autoSend: false, speak: false };
+  const prefs = { agent: "", autoSend: false, speak: false, voice: "" };
   try {
     Object.assign(prefs, JSON.parse(localStorage.getItem(KEY) ?? "{}"));
   } catch {}
@@ -68,12 +68,17 @@ function init() {
   settings.append(el("summary", null, "Voice settings"));
   const auto = checkbox("Send what I say without asking (still needs the owner's approval)");
   const speak = checkbox("Speak the agent's reply out loud");
+  const voiceRow = el("label", "jv-check");
+  const voicePick = el("select", "jv-voice");
+  voiceRow.append(el("span", null, "Voice"), voicePick);
+  voiceRow.hidden = true;
   const gestures = checkbox("Camera gesture: cover the lens to start or stop talking");
   const memory = checkbox("Remember notes for this agent");
   const memoryNote = el("div", "muted jv-note");
   settings.append(
     auto.wrap,
     speak.wrap,
+    voiceRow,
     gestures.wrap,
     el("div", "muted jv-note", "Gestures use their own camera permission and never raise your hand."),
     memory.wrap,
@@ -175,17 +180,50 @@ function init() {
     const cut = plain.slice(0, MAX_SPOKEN);
     return `${cut.slice(0, Math.max(cut.lastIndexOf(". ") + 1, 200))} The rest is in the chat.`;
   };
+  // Natural voices come from the room's Kokoro service; the browser voice is the fallback.
+  let naturalVoice = false;
+  const player = new Audio();
+  const silence = (() => {
+    const bytes = new Uint8Array(46);
+    const view = new DataView(bytes.buffer);
+    [..."RIFF"].forEach((c, i) => (bytes[i] = c.charCodeAt(0)));
+    view.setUint32(4, 38, true);
+    [..."WAVEfmt "].forEach((c, i) => (bytes[8 + i] = c.charCodeAt(0)));
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, 8000, true);
+    view.setUint32(28, 16000, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    [..."data"].forEach((c, i) => (bytes[36 + i] = c.charCodeAt(0)));
+    view.setUint32(40, 2, true);
+    return URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }));
+  })();
+  // iOS only lets a page play audio later if it first played some during a tap.
+  const unlock = () => {
+    player.src = silence;
+    player.play().catch(() => {});
+    window.removeEventListener("pointerdown", unlock);
+  };
+  window.addEventListener("pointerdown", unlock);
+  let playing = null;
+
   const cancelSpeech = () => {
     utterance = null;
     speaking = false;
+    if (playing) {
+      player.pause();
+      URL.revokeObjectURL(playing);
+      playing = null;
+    }
     window.speechSynthesis?.cancel();
   };
-  const say = (value) => {
+  const sayWithBrowser = (words, current) => {
     if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const current = new SpeechSynthesisUtterance(spoken(value));
+    const spokenNow = new SpeechSynthesisUtterance(words);
     utterance = current;
-    current.onstart = () => {
+    spokenNow.onstart = () => {
       if (utterance !== current) return;
       speaking = true;
       render();
@@ -196,9 +234,48 @@ function init() {
       speaking = false;
       render();
     };
-    current.onend = done;
-    current.onerror = done;
-    window.speechSynthesis.speak(current);
+    spokenNow.onend = done;
+    spokenNow.onerror = done;
+    window.speechSynthesis.speak(spokenNow);
+  };
+  const say = async (value) => {
+    cancelSpeech();
+    const words = spoken(value);
+    const current = {};
+    utterance = current;
+    if (naturalVoice && app.speech) {
+      try {
+        const url = URL.createObjectURL(await app.speech(words, prefs.voice || undefined));
+        if (utterance !== current) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        playing = url;
+        player.src = url;
+        const done = () => {
+          if (playing !== url) return;
+          URL.revokeObjectURL(url);
+          playing = null;
+          utterance = null;
+          speaking = false;
+          render();
+        };
+        player.onended = done;
+        player.onerror = done;
+        speaking = true;
+        render();
+        await player.play();
+        return;
+      } catch {
+        if (utterance !== current) return;
+        if (playing) {
+          URL.revokeObjectURL(playing);
+          playing = null;
+        }
+        speaking = false;
+      }
+    }
+    sayWithBrowser(words, current);
   };
 
   // --- push to talk ---
@@ -381,10 +458,36 @@ function init() {
     prefs.autoSend = auto.input.checked;
     save();
   });
+  const VOICE_GROUPS = { af: "US woman", am: "US man", bf: "British woman", bm: "British man" };
+  const voiceLabel = (id) => {
+    const [group, name = id] = id.split("_");
+    const who = VOICE_GROUPS[group];
+    const nice = name.charAt(0).toUpperCase() + name.slice(1);
+    return who ? `${nice} (${who})` : nice;
+  };
+  app.voices?.().then(({ available, voices = [], default: fallback }) => {
+    naturalVoice = available && voices.length > 0;
+    if (!naturalVoice) return;
+    const english = voices.filter((id) => /^(af|am|bf|bm)_/.test(id));
+    voicePick.replaceChildren(
+      ...english.map((id) => {
+        const option = el("option", null, voiceLabel(id));
+        option.value = id;
+        return option;
+      }),
+    );
+    voicePick.value = english.includes(prefs.voice) ? prefs.voice : (fallback ?? english[0]);
+    voiceRow.hidden = false;
+  });
+  voicePick.addEventListener("change", () => {
+    prefs.voice = voicePick.value;
+    save();
+    if (prefs.speak) void say("This is how I will sound.");
+  });
   speak.input.addEventListener("change", () => {
     prefs.speak = speak.input.checked;
     if (!prefs.speak) cancelSpeech();
-    if (prefs.speak && !window.speechSynthesis) notify("This browser cannot speak out loud.");
+    if (prefs.speak && !naturalVoice && !window.speechSynthesis) notify("This browser cannot speak out loud.");
     save();
     render();
   });
@@ -481,7 +584,7 @@ function init() {
         for (const name of mention(data.text)) awaiting.add(name);
       } else if (data.kind === "agent" && awaiting.delete(data.author.toLowerCase())) {
         hint = "";
-        if (prefs.speak && data.author.toLowerCase() === prefs.agent.toLowerCase()) say(data.text);
+        if (prefs.speak && data.author.toLowerCase() === prefs.agent.toLowerCase()) void say(data.text);
       }
     }
     render();

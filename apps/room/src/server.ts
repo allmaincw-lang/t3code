@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { mintLiveKitToken, readLiveKitConfig } from "./livekit.ts";
 import { handleVoice, VoiceError, voiceConfigFromEnv, type VoiceConfig } from "./voice.ts";
+import { handleTts } from "./tts.ts";
 import { createMeeting } from "./meeting.ts";
 import { parseRemember } from "./memory.ts";
 
@@ -330,6 +331,9 @@ export const createRoomServer = (
     }
     const voice = await handleVoice(voiceConfig, route, req);
     if (voice !== undefined) return voice;
+    const speech = await handleTts(route, req, res, (status, message) => new HttpError(status, message));
+    if (speech === "handled") return undefined;
+    if (speech !== undefined) return speech;
     if (req.method !== "POST") throw new HttpError(404, "Not found.");
     const body = await readBody(req);
 

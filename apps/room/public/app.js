@@ -36,7 +36,25 @@ const state = {
 };
 
 // Jarvis: the small surface jarvis.js builds on.
-window.roomApp = { state, api: (path, body) => api(path, body), notify: (text) => notify(text) };
+window.roomApp = {
+  state,
+  api: (path, body) => api(path, body),
+  notify: (text) => notify(text),
+  // Natural speech from the room's voice service, as an audio Blob.
+  speech: async (text, voice) => {
+    const res = await fetch("./api/tts", {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ text, voice }),
+    });
+    if (!res.ok) throw new Error("speech failed");
+    return res.blob();
+  },
+  voices: () =>
+    fetch("./api/tts/voices", { headers: { authorization: `Bearer ${token}` } })
+      .then((res) => (res.ok ? res.json() : { available: false, voices: [] }))
+      .catch(() => ({ available: false, voices: [] })),
+};
 
 const call = {
   active: false,

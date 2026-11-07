@@ -1,0 +1,17 @@
+{
+  "name": "@t3tools/room-tts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local Kokoro text-to-speech for the Room. Runs on this computer only.",
+  "scripts": {
+    "start": "node src/server.ts"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "3.5.1",
+    "kokoro-js": "1.2.1"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
