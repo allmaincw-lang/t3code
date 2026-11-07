@@ -8,6 +8,8 @@ import { mintLiveKitToken, readLiveKitConfig } from "./livekit.ts";
 import { handleVoice, VoiceError, voiceConfigFromEnv, type VoiceConfig } from "./voice.ts";
 import { handleTts } from "./tts.ts";
 import { createSync } from "./sync.ts";
+// code: shared project files (Code tab)
+import { createCode } from "./code.ts";
 import { createMeeting } from "./meeting.ts";
 import { parseRemember } from "./memory.ts";
 
@@ -201,6 +203,7 @@ export const createRoomServer = (
       .map(({ id, person, inCall }) => ({ id, person, inCall }));
   const broadcastPresence = () => broadcast("presence", publicConnections());
   const sync = createSync({ dataDir, broadcast, fail: (status, message) => new HttpError(status, message) });
+  const code = createCode({ dataDir, broadcast, fail: (status, message) => new HttpError(status, message) });
   const meeting = createMeeting({
     broadcast,
     find: (id) => (typeof id === "string" ? connections.get(id) : undefined),
@@ -353,6 +356,9 @@ export const createRoomServer = (
     if (voice !== undefined) return voice;
     const synced = await sync(route, req, person);
     if (synced !== undefined) return synced;
+    // code: Code tab routes (/api/code/*)
+    const coded = await code(route, req, person);
+    if (coded !== undefined) return coded;
     const speech = await handleTts(route, req, res, (status, message) => new HttpError(status, message));
     if (speech === "handled") return undefined;
     if (speech !== undefined) return speech;

@@ -1,0 +1,188 @@
+.code-wrap {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-areas: "side main";
+  gap: 12px;
+  min-height: 70dvh;
+}
+.code-files-toggle {
+  display: none;
+}
+.code-side {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  max-height: 80dvh;
+}
+.code-tree {
+  flex: 1;
+  min-height: 120px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.code-dir > summary {
+  cursor: pointer;
+  padding: 4px 6px;
+  color: var(--muted);
+}
+.code-dir > .code-dir,
+.code-dir > .code-file {
+  margin-left: 12px;
+}
+.code-file {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 32px;
+  padding: 2px 6px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.code-file[aria-current="true"] {
+  background: var(--tile);
+  color: var(--accent);
+}
+.code-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.code-badge {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--warn);
+  color: #111;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.code-dot {
+  flex: none;
+  min-width: 1.4em;
+  color: var(--warn);
+  font: 12px ui-monospace, monospace;
+  text-align: center;
+}
+.code-git {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.code-git-head,
+.code-commit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.code-changes {
+  max-height: 140px;
+  margin: 8px 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  font: 12px ui-monospace, monospace;
+  overflow-wrap: anywhere;
+}
+.code-commit input {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+}
+.code-note {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+.code-main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.code-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+.code-title {
+  overflow-wrap: anywhere;
+}
+.code-save {
+  margin-left: auto;
+}
+.code-warn {
+  padding: 8px 10px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  color: var(--warn);
+}
+.code-editor {
+  flex: 1;
+  min-height: 55dvh;
+  max-height: 75dvh;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #282c34;
+}
+.code-editor .cm-editor {
+  height: 100%;
+  max-height: 75dvh;
+}
+.code-editor .cm-scroller {
+  overflow: auto;
+}
+.code-empty {
+  padding: 16px;
+}
+.code-error {
+  color: var(--danger);
+}
+.code-editor .cm-content,
+.code-editor .cm-gutters {
+  font-size: 14px;
+}
+.cm-ySelectionInfo {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  padding: 1px 4px;
+  opacity: 1;
+}
+
+@media (max-width: 800px) {
+  .code-wrap {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "toggle" "side" "main";
+    min-height: 0;
+  }
+  .code-files-toggle {
+    display: block;
+    grid-area: toggle;
+    justify-self: start;
+  }
+  .code-side-collapsed {
+    display: none;
+  }
+  .code-side {
+    max-height: 60dvh;
+  }
+  .code-editor .cm-content,
+  .code-editor .cm-gutters {
+    font-size: 16px;
+  }
+}

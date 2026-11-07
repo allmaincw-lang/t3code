@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -507,4 +508,134 @@ test("shared documents replay their history and broadcast new updates", async ()
   assert.deepEqual(load.updates, ["AQID", "BAUG"]);
   assert.equal((await post(guest, "/api/sync/compact", { doc: "code:main", snapshot: "BwgJ" })).status, 200);
   assert.deepEqual((await (await post(owner, "/api/sync/load", { doc: "code:main" })).json()).updates, ["BwgJ"]);
+});
+
+// Code tab: the shared working copy.
+const git = (cwd: string, ...args: string[]) =>
+  execFileSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" } }).trim();
+
+const withCodeRoot = async (run: (root: string, outside: string) => Promise<void>) => {
+  const outside = mkdtempSync(join(tmpdir(), "room-code-"));
+  const root = join(outside, "work");
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(outside, "secret.txt"), "top secret");
+  writeFileSync(join(root, "src", "app.ts"), "export const a = 1;\n");
+  writeFileSync(join(root, "big.txt"), "x".repeat(1024 * 1024 + 1));
+  writeFileSync(join(root, "blob.dat"), Buffer.from([1, 2, 0, 3]));
+  writeFileSync(join(root, "latin.txt"), Buffer.from([0x68, 0xe9, 0x6c]));
+  writeFileSync(join(root, ".env"), "KEY=1");
+  mkdirSync(join(root, "node_modules"));
+  writeFileSync(join(root, "node_modules", "x.js"), "1");
+  symlinkSync(join(outside, "secret.txt"), join(root, "link.txt"));
+  symlinkSync(outside, join(root, "linkdir"));
+  git(root, "init", "-q");
+  git(root, "config", "user.name", "Setup");
+  git(root, "config", "user.email", "setup@example.com");
+  const previous = process.env.ROOM_CODE_ROOT;
+  process.env.ROOM_CODE_ROOT = root;
+  try {
+    await run(root, outside);
+  } finally {
+    if (previous === undefined) delete process.env.ROOM_CODE_ROOT;
+    else process.env.ROOM_CODE_ROOT = previous;
+    rmSync(outside, { recursive: true, force: true });
+  }
+};
+
+test("code routes need ROOM_CODE_ROOT", async () => {
+  const previous = process.env.ROOM_CODE_ROOT;
+  delete process.env.ROOM_CODE_ROOT;
+  try {
+    assert.equal((await post(owner, "/api/code/tree")).status, 503);
+  } finally {
+    if (previous !== undefined) process.env.ROOM_CODE_ROOT = previous;
+  }
+});
+
+test("code paths stay inside the root, including through symlinks", async () => {
+  await withCodeRoot(async (root, outside) => {
+    for (const path of ["../secret.txt", "/etc/passwd", "src/../../secret.txt", "link.txt", "linkdir/secret.txt", ".env", ".git/config", "node_modules/x.js", "src//app.ts", "a\\b"]) {
+      const open = await post(owner, "/api/code/open", { path });
+      assert.ok([400, 403, 404].includes(open.status), `open ${path} -> ${open.status}`);
+      const save = await post(owner, "/api/code/save", { path, text: "pwned" });
+      assert.ok([400, 403, 404].includes(save.status), `save ${path} -> ${save.status}`);
+    }
+    assert.equal(readFileSync(join(outside, "secret.txt"), "utf8"), "top secret");
+    const tree = (await (await post(owner, "/api/code/tree")).json()) as { files: Array<{ path: string }> };
+    assert.deepEqual(tree.files.map((file) => file.path), ["latin.txt", "src/app.ts"]);
+  });
+});
+
+test("code files over 1 MB or binary are refused", async () => {
+  await withCodeRoot(async () => {
+    assert.equal((await post(owner, "/api/code/open", { path: "big.txt" })).status, 413);
+    assert.equal((await post(owner, "/api/code/open", { path: "blob.dat" })).status, 415);
+    assert.equal((await post(owner, "/api/code/open", { path: "latin.txt" })).status, 415);
+    const tooBig = await post(owner, "/api/code/save", { path: "src/app.ts", text: "y".repeat(1024 * 1024 + 1) });
+    assert.equal(tooBig.status, 413);
+  });
+});
+
+test("opening and saving a file round-trips, and only one opener seeds it", async () => {
+  await withCodeRoot(async (root) => {
+    const open = (token: string, from: string) =>
+      post(token, "/api/code/open", { path: "src/app.ts", from }).then((res) => res.json()) as Promise<{
+        doc: string;
+        text: string;
+        seed: boolean;
+      }>;
+    const [a, b] = await Promise.all([open(owner, "conn-a"), open(guest, "conn-b")]);
+    assert.match(a.doc, /^[a-z0-9][a-z0-9:._-]{0,119}$/i);
+    assert.equal(a.doc, b.doc);
+    assert.equal(a.text, "export const a = 1;\n");
+    assert.equal([a.seed, b.seed].filter(Boolean).length, 1);
+    const again = await open(guest, "conn-c");
+    assert.equal(again.seed, false);
+
+    await post(owner, "/api/sync", { doc: a.doc, update: "AAE=", from: "conn-a" });
+    assert.equal((await open(guest, "conn-d")).seed, false);
+
+    const saved = await post(guest, "/api/code/save", { path: "src/app.ts", text: "export const a = 2;\n" });
+    assert.equal(saved.status, 200);
+    assert.equal(readFileSync(join(root, "src", "app.ts"), "utf8"), "export const a = 2;\n");
+  });
+});
+
+test("commit is made by the Room person and stays inside the worktree", async () => {
+  await withCodeRoot(async (root) => {
+    git(root, "add", "src");
+    git(root, "commit", "-qm", "base");
+    await post(owner, "/api/code/save", { path: "src/app.ts", text: "export const a = 3;\n" });
+    writeFileSync(join(root, "src", "new.ts"), "export {};\n");
+    const status = (await (await post(owner, "/api/code/status")).json()) as { changes: Array<{ path: string }> };
+    assert.ok(status.changes.some((change) => change.path === "src/new.ts"));
+    assert.ok(!status.changes.some((change) => change.path.includes(".env")));
+
+    assert.equal((await post(owner, "/api/code/commit", { message: " " })).status, 400);
+    const done = await post(owner, "/api/code/commit", { message: "Tweak app" });
+    assert.equal(done.status, 200);
+    assert.equal(git(root, "log", "-1", "--format=%an|%s"), "Chase|Tweak app");
+    assert.equal(git(root, "ls-files", ".env"), "");
+    assert.equal(git(root, "status", "--porcelain", "--", "src"), "");
+    assert.equal((await post(owner, "/api/code/commit", { message: "again" })).status, 409);
+  });
+
+  // A folder inside a bigger repo is refused, so a commit can never reach files outside it.
+  const outer = mkdtempSync(join(tmpdir(), "room-code-outer-"));
+  const previous = process.env.ROOM_CODE_ROOT;
+  try {
+    git(outer, "init", "-q");
+    git(outer, "config", "user.name", "Setup");
+    git(outer, "config", "user.email", "setup@example.com");
+    mkdirSync(join(outer, "inner"));
+    writeFileSync(join(outer, "inner", "a.ts"), "1");
+    writeFileSync(join(outer, "elsewhere.txt"), "1");
+    process.env.ROOM_CODE_ROOT = join(outer, "inner");
+    assert.equal((await post(owner, "/api/code/commit", { message: "nope" })).status, 409);
+    assert.equal(git(outer, "diff", "--cached", "--name-only"), "");
+  } finally {
+    if (previous === undefined) delete process.env.ROOM_CODE_ROOT;
+    else process.env.ROOM_CODE_ROOT = previous;
+    rmSync(outer, { recursive: true, force: true });
+  }
 });
