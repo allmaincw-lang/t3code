@@ -1,3 +1,5 @@
+import { createDictation } from "./voice.js";
+
 const $ = (id) => document.getElementById(id);
 const TOKEN_KEY = "room-token";
 const STATUS_LABELS = {
@@ -431,16 +433,26 @@ const startTalking = () => {
   active.start();
 };
 
+const dictation = token
+  ? createDictation({ token, input: $("message-input"), button: $("talk"), notify })
+  : null;
+let localVoice = false;
 $("talk").hidden = !SpeechRecognizer;
+dictation?.available().then((available) => {
+  localVoice = available;
+  $("talk").hidden = !(available || SpeechRecognizer);
+});
 $("talk").addEventListener("click", () => {
-  if (recognizer) stopTalking(false);
+  if (localVoice) dictation.toggle();
+  else if (recognizer) stopTalking(false);
   else startTalking();
 });
-$("message-input").addEventListener("input", () => stopTalking(true));
+$("message-input").addEventListener("input", () => !localVoice && stopTalking(true));
 
 $("composer").addEventListener("submit", async (event) => {
   event.preventDefault();
   stopTalking(true);
+  dictation?.cancel();
   const input = $("message-input");
   const text = input.value.trim();
   if (!text) return;
