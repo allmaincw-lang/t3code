@@ -4,6 +4,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { mintLiveKitToken, readLiveKitConfig } from "./livekit.ts";
+
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_TEXT = 8_000;
@@ -14,6 +16,11 @@ const STATIC_FILES: Record<string, { file: string; type: string }> = {
   "/": { file: "public/index.html", type: "text/html; charset=utf-8" },
   "/app.js": { file: "public/app.js", type: "text/javascript; charset=utf-8" },
   "/style.css": { file: "public/style.css", type: "text/css; charset=utf-8" },
+  "/livekit-call.js": { file: "public/livekit-call.js", type: "text/javascript; charset=utf-8" },
+  "/vendor/livekit-client-2.22.4.umd.js": {
+    file: "public/vendor/livekit-client-2.22.4.umd.js",
+    type: "text/javascript; charset=utf-8",
+  },
 };
 
 type Message = {
@@ -113,6 +120,17 @@ const httpLink = (value: unknown): string | null => {
     return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
   } catch {
     return null;
+  }
+};
+
+const livekitOrigins = () => {
+  const url = process.env.ROOM_LIVEKIT_URL;
+  if (!url) return "";
+  try {
+    const { protocol, host } = new URL(url);
+    return `${protocol}//${host}${protocol === "wss:" ? ` https://${host}` : ` http://${host}`}`;
+  } catch {
+    return "";
   }
 };
 
@@ -268,6 +286,12 @@ export const createRoomServer = (dataDir: string): Server => {
       routeMentions(person, text);
       return { id: message.id };
     }
+    if (route === "POST /api/livekit/token") {
+      const config = readLiveKitConfig();
+      if (!config) throw new HttpError(503, "Video calls are not set up on this room.");
+      const room = "room";
+      return { url: config.url, token: mintLiveKitToken(config, room, person), room };
+    }
     if (route === "POST /api/call") {
       const conn = connections.get(requireText(body.connectionId, "connectionId"));
       if (!conn || conn.person !== person) throw new HttpError(404, "Unknown connection.");
@@ -359,7 +383,7 @@ export const createRoomServer = (dataDir: string): Server => {
         "x-content-type-options": "nosniff",
         "referrer-policy": "no-referrer",
         "content-security-policy":
-          "default-src 'self'; media-src 'self' blob:; img-src 'self' data:; frame-ancestors 'none'",
+          `default-src 'self'; connect-src 'self' ${livekitOrigins()}; media-src 'self' blob:; img-src 'self' data:; frame-ancestors 'none'`,
       });
       res.end(readFileSync(join(ROOT, asset.file)));
       return;

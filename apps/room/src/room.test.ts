@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { createHmac } from "node:crypto";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -161,4 +162,53 @@ test("chat history survives a restart", async () => {
   controller.abort();
   restarted.closeAllConnections();
   await new Promise((resolve) => restarted.close(resolve));
+});
+
+test("LiveKit tokens need an invite and a configured server", async () => {
+  assert.equal((await post("wrong", "/api/livekit/token")).status, 401);
+  assert.equal((await post(owner, "/api/livekit/token")).status, 503);
+
+  const secretFile = join(dataDir, "livekit-secret");
+  writeFileSync(secretFile, "test-secret\n");
+  process.env.ROOM_LIVEKIT_URL = "wss://lk.example.test";
+  process.env.ROOM_LIVEKIT_KEY = "test-key";
+  process.env.ROOM_LIVEKIT_SECRET_FILE = secretFile;
+  try {
+    const before = Math.floor(Date.now() / 1000);
+    const res = await post(guest, "/api/livekit/token");
+    assert.equal(res.status, 200);
+    const { url, token, room } = await res.json();
+    assert.equal(url, "wss://lk.example.test");
+    assert.equal(room, "room");
+
+    const [header, payload, signature] = token.split(".");
+    assert.equal(
+      signature,
+      createHmac("sha256", "test-secret").update(`${header}.${payload}`).digest("base64url"),
+    );
+    assert.deepEqual(JSON.parse(Buffer.from(header, "base64url").toString()), {
+      alg: "HS256",
+      typ: "JWT",
+    });
+    const claims = JSON.parse(Buffer.from(payload, "base64url").toString());
+    assert.equal(claims.iss, "test-key");
+    assert.equal(claims.name, "Partner");
+    assert.match(claims.sub, /^Partner-/);
+    assert.ok(claims.exp - before >= 6 * 3600 && claims.exp - before <= 6 * 3600 + 5);
+    assert.deepEqual(claims.video, {
+      roomJoin: true,
+      room: "room",
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: true,
+    });
+
+    const again = await (await post(guest, "/api/livekit/token")).json();
+    const sub = (jwt: string) => JSON.parse(Buffer.from(jwt.split(".")[1]!, "base64url").toString()).sub;
+    assert.notEqual(sub(again.token), claims.sub);
+  } finally {
+    delete process.env.ROOM_LIVEKIT_URL;
+    delete process.env.ROOM_LIVEKIT_KEY;
+    delete process.env.ROOM_LIVEKIT_SECRET_FILE;
+  }
 });
