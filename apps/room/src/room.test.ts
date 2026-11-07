@@ -508,3 +508,195 @@ test("shared documents replay their history and broadcast new updates", async ()
   assert.equal((await post(guest, "/api/sync/compact", { doc: "code:main", snapshot: "BwgJ" })).status, 200);
   assert.deepEqual((await (await post(owner, "/api/sync/load", { doc: "code:main" })).json()).updates, ["BwgJ"]);
 });
+
+// Agent mail: a fake `gh` that records its arguments and stdin, never talks to GitHub.
+const fakeGh = (dir: string, fixtures: unknown) => {
+  const script = join(dir, "gh");
+  writeFileSync(
+    script,
+    `#!${process.execPath}
+const fs = require("node:fs");
+const args = process.argv.slice(2);
+const stdin = args.includes("-") ? fs.readFileSync(0, "utf8") : "";
+fs.appendFileSync(process.env.FAKE_GH_LOG, JSON.stringify({ args, stdin }) + "\\n");
+const fx = JSON.parse(fs.readFileSync(process.env.FAKE_GH_FIXTURES, "utf8"));
+if (args[0] === "issue" && args[1] === "list") console.log(JSON.stringify(fx.list[args[args.indexOf("--label") + 1]] ?? []));
+else if (args[0] === "issue" && args[1] === "view") {
+  if (!fx.view[args[2]]) { console.error("GraphQL: Could not resolve to an issue"); process.exit(1); }
+  console.log(JSON.stringify(fx.view[args[2]]));
+} else if (args[0] === "issue" && args[1] === "create") console.log("https://github.com/o/r/issues/42");
+else if (args[0] === "issue" && args[1] === "comment") console.log("https://github.com/o/r/issues/7#issuecomment-1");
+else process.exit(2);
+`,
+    { mode: 0o755 },
+  );
+  writeFileSync(join(dir, "fixtures.json"), JSON.stringify(fixtures));
+  return {
+    log: () =>
+      readFileSync(join(dir, "gh.log"), "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line) as { args: string[]; stdin: string }),
+  };
+};
+
+const withFakeGh = async (fixtures: unknown, body: (gh: ReturnType<typeof fakeGh>) => Promise<void>) => {
+  const dir = mkdtempSync(join(tmpdir(), "room-gh-"));
+  writeFileSync(join(dir, "gh.log"), "");
+  const gh = fakeGh(dir, fixtures);
+  const saved = { path: process.env.PATH, repo: process.env.ROOM_MAIL_REPO };
+  process.env.PATH = `${dir}:${saved.path}`;
+  process.env.ROOM_MAIL_REPO = "owner/agent-mail";
+  process.env.FAKE_GH_LOG = join(dir, "gh.log");
+  process.env.FAKE_GH_FIXTURES = join(dir, "fixtures.json");
+  try {
+    await body(gh);
+  } finally {
+    process.env.PATH = saved.path;
+    if (saved.repo === undefined) delete process.env.ROOM_MAIL_REPO;
+    else process.env.ROOM_MAIL_REPO = saved.repo;
+    rmSync(dir, { recursive: true, force: true });
+  }
+};
+
+const label = (name: string) => ({ name });
+const mailFixtures = {
+  list: {
+    "agent-mail": [
+      { number: 8, title: "[chase-claude→all] Claim: x", url: "u8", updatedAt: "2026-01-01T00:00:00Z", labels: [label("agent-mail"), label("claim"), label("to:all")] },
+      { number: 3, title: "[a→b] Q", url: "u3", updatedAt: "2026-01-01T00:00:00Z", labels: [label("agent-mail"), label("to:b-codex"), label("to:all")] },
+      { number: 1, title: "Agent directory", url: "u1", labels: [label("agent-mail"), label("directory"), label("to:b-codex")] },
+    ],
+    claim: [
+      {
+        number: 8,
+        title: "[chase-claude→all] Claim: invite links",
+        url: "u8",
+        body: "**From:** chase-claude\n**To:** all\n\n**Task:** t\n**Files:** `apps/room/src/{server,service}.ts`, `packages/contract/PROTOCOL.md`, `apps/web/src/`\n**Branch:** `feat/invite-links`\n**Status:** x\n",
+      },
+      { number: 9, title: "[z→all] Claim: bare", url: "u9", body: "**Files:** a.ts, b/{c,d}.ts\n**Branch:** none\n" },
+    ],
+  },
+  view: {
+    "7": { number: 7, title: "[sam-codex→chase-claude] Topic", state: "OPEN", url: "u7", body: "b", labels: [label("agent-mail")], comments: [{ author: { login: "x" }, body: "hi", createdAt: "2026-01-01T00:00:00Z", url: "c" }] },
+    "5": { number: 5, title: "Plain issue", state: "OPEN", url: "u5", labels: [label("bug")], comments: [] },
+    "6": { number: 6, title: "[a→b] Old", state: "CLOSED", url: "u6", labels: [label("agent-mail")], comments: [] },
+  },
+};
+
+test("agent mail is off without ROOM_MAIL_REPO and needs an invite", async () => {
+  delete process.env.ROOM_MAIL_REPO;
+  assert.equal((await post(owner, "/api/mail/threads")).status, 503);
+  assert.equal((await post("wrong", "/api/mail/threads")).status, 401);
+});
+
+test("agent mail reads threads, inbox counts and parsed claims, and caches reads", async () => {
+  await withFakeGh(mailFixtures, async (gh) => {
+    const threads = await (await post(owner, "/api/mail/threads")).json();
+    assert.equal(threads.me, "chase-room");
+    assert.deepEqual(threads.inboxes, { all: 2, "b-codex": 1 });
+    const claims = (await (await post(owner, "/api/mail/claims")).json()).claims;
+    assert.deepEqual(claims[0], {
+      number: 8,
+      title: "[chase-claude→all] Claim: invite links",
+      agent: "chase-claude",
+      files: ["apps/room/src/server.ts", "apps/room/src/service.ts", "packages/contract/PROTOCOL.md", "apps/web/src/"],
+      branch: "feat/invite-links",
+      url: "u8",
+    });
+    assert.deepEqual(claims[1].files, ["a.ts", "b/c.ts", "b/d.ts"]);
+    assert.equal(claims[1].agent, "z");
+    assert.equal(claims[1].branch, "");
+    const before = gh.log().length;
+    await post(guest, "/api/mail/threads");
+    await post(guest, "/api/mail/claims");
+    assert.equal(gh.log().length, before, "second read comes from the cache");
+    assert.deepEqual(gh.log()[0]!.args.slice(0, 4), ["issue", "list", "-R", "owner/agent-mail"]);
+  });
+});
+
+test("the cache expires after about 30 seconds and a write clears it", async () => {
+  const { createMail } = await import("./mail.ts");
+  await withFakeGh(mailFixtures, async (gh) => {
+    let clock = 0;
+    const mail = createMail({ fail: (status, message) => new Error(`${status} ${message}`), now: () => clock });
+    await mail("POST /api/mail/claims", {}, "Chase");
+    clock = 29_000;
+    await mail("POST /api/mail/claims", {}, "Chase");
+    assert.equal(gh.log().length, 1);
+    clock = 31_000;
+    await mail("POST /api/mail/claims", {}, "Chase");
+    assert.equal(gh.log().length, 2);
+    await mail("POST /api/mail/reply", { number: 7, text: "hi" }, "Chase");
+    await mail("POST /api/mail/claims", {}, "Chase");
+    assert.equal(gh.log().filter((call) => call.args[1] === "list").length, 3);
+  });
+});
+
+test("agent mail reply writes exactly one comment in the agent-mail format", async () => {
+  await withFakeGh(mailFixtures, async (gh) => {
+    const res = await post(owner, "/api/mail/reply", { number: 7, text: "Hello @sam-codex and @someone/team, mail a@b.co" });
+    assert.equal(res.status, 200);
+    const writes = gh.log().filter((call) => call.args[1] === "comment");
+    assert.equal(writes.length, 1);
+    assert.deepEqual(writes[0]!.args, ["issue", "comment", "7", "-R", "owner/agent-mail", "--body-file", "-"]);
+    assert.equal(writes[0]!.stdin, "**From:** chase-room\n**To:** sam-codex, chase-claude\n\nHello sam-codex and someone/team, mail a@b.co\n");
+    // The thread fetch that guards the write is fresh and limited to labels and state.
+    assert.deepEqual(gh.log()[0]!.args, ["issue", "view", "7", "-R", "owner/agent-mail", "--json", "number,title,state,labels"]);
+  });
+});
+
+test("agent mail refuses bad input and non-mail or closed threads without writing", async () => {
+  await withFakeGh(mailFixtures, async (gh) => {
+    for (const body of [
+      { number: "7; rm -rf /", text: "x" },
+      { number: 0, text: "x" },
+      { number: 7.5, text: "x" },
+      { number: 7, text: "   " },
+      { number: 7, text: "x", to: ["Bad Name"] },
+      { number: 7, text: "x", to: "--repo=evil" },
+    ]) {
+      assert.equal((await post(owner, "/api/mail/reply", body)).status, 400, JSON.stringify(body));
+    }
+    assert.equal((await post(owner, "/api/mail/reply", { number: 5, text: "x" })).status, 404);
+    assert.equal((await post(owner, "/api/mail/reply", { number: 6, text: "x" })).status, 409);
+    assert.equal((await post(owner, "/api/mail/reply", { number: 99, text: "x" })).status, 404);
+    assert.equal((await post(owner, "/api/mail/new", { title: "", body: "x" })).status, 400);
+    assert.equal((await post(owner, "/api/mail/new", { title: "t", body: "x", inbox: "to:x y" })).status, 400);
+    assert.equal((await post(owner, "/api/mail/new", { title: "t", body: "x", inbox: ["a", "b"] })).status, 400);
+    assert.equal(gh.log().filter((call) => ["comment", "create"].includes(call.args[1]!)).length, 0);
+    // Oversized text is capped, not rejected.
+    await post(owner, "/api/mail/reply", { number: 7, text: "y".repeat(20_000) });
+    const sent = gh.log().find((call) => call.args[1] === "comment")!;
+    assert.ok(sent.stdin.length < 8_100);
+  });
+});
+
+test("new threads pass titles and bodies as plain arguments, never through a shell", async () => {
+  await withFakeGh(mailFixtures, async (gh) => {
+    const nasty = '$(touch /tmp/pwned) `id` ; "quoted" \'x\' --label evil\nsecond line @chase-claude';
+    const res = await post(owner, "/api/mail/new", { title: nasty, body: nasty, inbox: "sam-codex" });
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { ok: true, number: 42, url: "https://github.com/o/r/issues/42", from: "chase-room", to: "sam-codex" });
+    const [create] = gh.log();
+    assert.deepEqual(create!.args, [
+      "issue", "create", "-R", "owner/agent-mail",
+      "--label", "agent-mail", "--label", "to:sam-codex",
+      "--title", '[chase-room→sam-codex] $(touch /tmp/pwned) `id` ; "quoted" \'x\' --label evil second line chase-claude',
+      "--body-file", "-",
+    ]);
+    assert.equal(create!.stdin, `**From:** chase-room\n**To:** sam-codex\n\n$(touch /tmp/pwned) \`id\` ; "quoted" 'x' --label evil\nsecond line chase-claude\n`);
+  });
+  await withFakeGh(mailFixtures, async (gh) => {
+    await post(guest, "/api/mail/new", { title: "No tag", body: "b" });
+    assert.deepEqual(gh.log()[0]!.args.slice(0, 6), ["issue", "create", "-R", "owner/agent-mail", "--label", "agent-mail"]);
+    assert.ok(!gh.log()[0]!.args.some((arg) => arg.startsWith("to:")));
+    assert.ok(gh.log()[0]!.args.includes("[partner-room→all] No tag"));
+  });
+});
+
+test("gh failures become clean errors", async () => {
+  await withFakeGh(mailFixtures, async () => {
+    process.env.PATH = "/nonexistent";
+    const res = await post(owner, "/api/mail/threads");
+    assert.equal(res.status, 502);
+    assert.match((await res.json()).error, /not installed/);
+  });
+});

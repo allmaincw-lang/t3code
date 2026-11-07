@@ -10,6 +10,7 @@ import { handleTts } from "./tts.ts";
 import { createSync } from "./sync.ts";
 import { createMeeting } from "./meeting.ts";
 import { parseRemember } from "./memory.ts";
+import { createMail } from "./mail.ts";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const MAX_BODY_BYTES = 64 * 1024;
@@ -208,6 +209,7 @@ export const createRoomServer = (
       throw new HttpError(status, message);
     },
   });
+  const mail = createMail({ fail: (status, message) => new HttpError(status, message) });
   const agentKey = (name: string) => name.toLowerCase();
 
   const addMessage = (author: string, kind: Message["kind"], text: string) => {
@@ -379,6 +381,8 @@ export const createRoomServer = (
       broadcastPresence();
       return { ok: true };
     }
+    const mailed = await mail(route, body, person);
+    if (mailed !== undefined) return mailed;
     const meetingResult = meeting.handle(route, body, person);
     if (meetingResult !== undefined) return meetingResult;
     if (route === "POST /api/signal") {
