@@ -485,3 +485,26 @@ test("natural speech is proxied to the local voice service only for invited peop
     await new Promise((resolve) => service.close(resolve));
   }
 });
+
+test("static files never escape public and unknown types are not served", async () => {
+  assert.equal((await fetch(`${base}/workspace.js`)).status, 200);
+  for (const path of ["/../src/server.ts", "/%2e%2e/src/server.ts", "/..%2fsrc%2fserver.ts", "/people.json"]) {
+    assert.notEqual((await fetch(`${base}${path}`)).status, 200, path);
+  }
+});
+
+test("shared documents replay their history and broadcast new updates", async () => {
+  const stream = await openEvents(guest);
+  await stream.next("snapshot");
+  assert.equal((await post(owner, "/api/sync", { doc: "../escape", update: "AAAA" })).status, 400);
+  assert.equal((await post(owner, "/api/sync", { doc: "code:main", update: "not base64!" })).status, 400);
+  assert.equal((await post("wrong", "/api/sync", { doc: "code:main", update: "AAAA" })).status, 401);
+  assert.equal((await post(owner, "/api/sync", { doc: "code:main", update: "AQID", from: "c1" })).status, 200);
+  const event = await stream.next("sync");
+  assert.deepEqual(event, { doc: "code:main", update: "AQID", from: "c1", by: "Chase" });
+  await post(owner, "/api/sync", { doc: "code:main", update: "BAUG" });
+  const load = await (await post(guest, "/api/sync/load", { doc: "code:main" })).json();
+  assert.deepEqual(load.updates, ["AQID", "BAUG"]);
+  assert.equal((await post(guest, "/api/sync/compact", { doc: "code:main", snapshot: "BwgJ" })).status, 200);
+  assert.deepEqual((await (await post(owner, "/api/sync/load", { doc: "code:main" })).json()).updates, ["BwgJ"]);
+});

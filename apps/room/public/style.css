@@ -423,3 +423,24 @@ button[aria-pressed="true"] {
     padding: 6px 12px;
   }
 }
+
+.workspace-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+}
+
+.workspace-tabs button[aria-selected="true"] {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--panel);
+}
+
+.workspace-hidden {
+  display: none !important;
+}
+
+.workspace-pane {
+  min-height: 60dvh;
+}

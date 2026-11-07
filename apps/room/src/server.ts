@@ -1,12 +1,13 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { dirname, join } from "node:path";
+import { dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { mintLiveKitToken, readLiveKitConfig } from "./livekit.ts";
 import { handleVoice, VoiceError, voiceConfigFromEnv, type VoiceConfig } from "./voice.ts";
 import { handleTts } from "./tts.ts";
+import { createSync } from "./sync.ts";
 import { createMeeting } from "./meeting.ts";
 import { parseRemember } from "./memory.ts";
 
@@ -16,19 +17,37 @@ const MAX_TEXT = 8_000;
 const HISTORY_LIMIT = 300;
 const HEARTBEAT_MS = 20_000;
 const AGENT_STATUSES = new Set(["idle", "working", "needs-approval", "error"]);
-const STATIC_FILES: Record<string, { file: string; type: string }> = {
-  "/": { file: "public/index.html", type: "text/html; charset=utf-8" },
-  "/app.js": { file: "public/app.js", type: "text/javascript; charset=utf-8" },
-  "/voice.js": { file: "public/voice.js", type: "text/javascript; charset=utf-8" },
-  "/style.css": { file: "public/style.css", type: "text/css; charset=utf-8" },
-  "/livekit-call.js": { file: "public/livekit-call.js", type: "text/javascript; charset=utf-8" },
-  "/vendor/livekit-client-2.22.4.umd.js": {
-    file: "public/vendor/livekit-client-2.22.4.umd.js",
-    type: "text/javascript; charset=utf-8",
-  },
-  "/meeting.js": { file: "public/meeting.js", type: "text/javascript; charset=utf-8" },
-  "/jarvis.js": { file: "public/jarvis.js", type: "text/javascript; charset=utf-8" },
-  "/jarvis.css": { file: "public/jarvis.css", type: "text/css; charset=utf-8" },
+const PUBLIC_DIR = join(ROOT, "public");
+const ASSET_TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json",
+  ".map": "application/json",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".webp": "image/webp",
+  ".woff2": "font/woff2",
+  ".glb": "model/gltf-binary",
+  ".gltf": "model/gltf+json",
+  ".wasm": "application/wasm",
+};
+
+// Any file under public/ with a known type, so features add files without touching this list.
+const staticAsset = (pathname: string) => {
+  let relative: string;
+  try {
+    relative = pathname === "/" ? "index.html" : decodeURIComponent(pathname).replace(/^\/+/, "");
+  } catch {
+    return null;
+  }
+  const file = resolve(PUBLIC_DIR, relative);
+  if (!file.startsWith(PUBLIC_DIR + sep)) return null;
+  const type = ASSET_TYPES[extname(file).toLowerCase()];
+  if (!type || !existsSync(file) || !statSync(file).isFile()) return null;
+  return { file, type };
 };
 
 type Message = {
@@ -181,6 +200,7 @@ export const createRoomServer = (
       .filter((conn) => conn.kind === "browser")
       .map(({ id, person, inCall }) => ({ id, person, inCall }));
   const broadcastPresence = () => broadcast("presence", publicConnections());
+  const sync = createSync({ dataDir, broadcast, fail: (status, message) => new HttpError(status, message) });
   const meeting = createMeeting({
     broadcast,
     find: (id) => (typeof id === "string" ? connections.get(id) : undefined),
@@ -331,6 +351,8 @@ export const createRoomServer = (
     }
     const voice = await handleVoice(voiceConfig, route, req);
     if (voice !== undefined) return voice;
+    const synced = await sync(route, req, person);
+    if (synced !== undefined) return synced;
     const speech = await handleTts(route, req, res, (status, message) => new HttpError(status, message));
     if (speech === "handled") return undefined;
     if (speech !== undefined) return speech;
@@ -456,7 +478,7 @@ export const createRoomServer = (
       const agent = (req.headers["user-agent"] ?? "").slice(0, 60);
       console.log(`${req.method} ${url.pathname} from ${req.headers["x-forwarded-for"] ?? "local"} ${agent}`);
     }
-    const asset = req.method === "GET" ? STATIC_FILES[url.pathname] : undefined;
+    const asset = req.method === "GET" && !url.pathname.startsWith("/api/") ? staticAsset(url.pathname) : null;
     if (asset) {
       res.writeHead(200, {
         "content-type": asset.type,
@@ -464,9 +486,9 @@ export const createRoomServer = (
         "x-content-type-options": "nosniff",
         "referrer-policy": "no-referrer",
         "content-security-policy":
-          `default-src 'self'; connect-src 'self' ${livekitOrigins()}; media-src 'self' blob:; img-src 'self' data:; frame-ancestors 'none'`,
+          `default-src 'self'; connect-src 'self' ${livekitOrigins()}; media-src 'self' blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; worker-src 'self' blob:; frame-ancestors 'none'`,
       });
-      res.end(readFileSync(join(ROOT, asset.file)));
+      res.end(readFileSync(asset.file));
       return;
     }
     void (async () => {
