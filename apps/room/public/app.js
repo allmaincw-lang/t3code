@@ -380,8 +380,67 @@ const run = async () => {
   }
 };
 
+const SpeechRecognizer = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+const SPEECH_ERRORS = {
+  "not-allowed": "Microphone or speech recognition is not allowed. Check this browser's settings.",
+  "service-not-allowed": "Speech recognition is turned off. On iPhone, turn on Dictation in Settings.",
+  "audio-capture": "No microphone was found.",
+  network: "Speech recognition needs an internet connection.",
+};
+let recognizer = null;
+
+const setTalking = (talking) => {
+  $("talk").textContent = talking ? "Stop" : "Talk";
+  $("talk").setAttribute("aria-pressed", String(talking));
+};
+
+const stopTalking = (discard) => {
+  const active = recognizer;
+  if (!active) return;
+  if (discard) recognizer = null;
+  if (discard) active.abort();
+  else active.stop();
+  setTalking(false);
+};
+
+const startTalking = () => {
+  const input = $("message-input");
+  const before = input.value.trim() === "" ? "" : `${input.value.trim()} `;
+  const active = new SpeechRecognizer();
+  active.continuous = true;
+  active.interimResults = true;
+  active.lang = navigator.language;
+  active.onresult = (event) => {
+    if (recognizer !== active) return;
+    const spoken = Array.from(event.results, (result) => result[0].transcript).join("");
+    input.value = before + spoken.trim();
+    input.scrollTop = input.scrollHeight;
+  };
+  active.onerror = (event) => {
+    if (event.error === "no-speech" || event.error === "aborted") return;
+    notify(SPEECH_ERRORS[event.error] ?? "Speech recognition stopped working. Please try again.");
+  };
+  active.onend = () => {
+    if (recognizer !== active) return;
+    recognizer = null;
+    setTalking(false);
+  };
+  recognizer = active;
+  notify(null);
+  setTalking(true);
+  active.start();
+};
+
+$("talk").hidden = !SpeechRecognizer;
+$("talk").addEventListener("click", () => {
+  if (recognizer) stopTalking(false);
+  else startTalking();
+});
+$("message-input").addEventListener("input", () => stopTalking(true));
+
 $("composer").addEventListener("submit", async (event) => {
   event.preventDefault();
+  stopTalking(true);
   const input = $("message-input");
   const text = input.value.trim();
   if (!text) return;
