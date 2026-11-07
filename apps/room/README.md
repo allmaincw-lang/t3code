@@ -52,6 +52,29 @@ tailscale serve --bg --set-path=/room http://127.0.0.1:4780
 
 Tailnet access rules must allow the port. A rule that only allows 443 blocks any other HTTPS port.
 
+## Dictation on this computer
+
+The Talk button records in the browser and sends the audio to the room, which hands it to T3's own
+speech engine (the Handy models), so it never goes to Apple or Google. Without this setup Talk falls
+back to the browser's built-in recognition. T3 must be running with a speech model downloaded.
+
+On the machine that runs T3 and the room, create a key that can only run speech, then point the room
+at it. It is saved owner-readable only, and the key is never printed:
+
+```bash
+mkdir -p ~/.connected-empire && (umask 077 && t3 auth session issue --scope orchestration:operate --label "Room voice" --ttl 365d --token-only > ~/.connected-empire/room-voice.token)
+ROOM_T3_URL=http://127.0.0.1:3773 ROOM_T3_VOICE_TOKEN_FILE=$HOME/.connected-empire/room-voice.token node src/server.ts
+```
+
+Other scripts on the page can use `window.roomVoice` (see `createRoomVoice` in `public/voice.js`):
+`await roomVoice.ready`, check `roomVoice.source` is `"local"` (otherwise it is `"browser"` and
+`start()` rejects), then `await roomVoice.start()` and `const text = await roomVoice.stop()`. Also
+`state`, `cancel()` and `onstatechange`.
+
+`orchestration:operate` is the narrowest scope T3's transcribe endpoint accepts. The room reads the
+file on each request, so a new key takes effect without a restart. Recordings are limited to 5
+minutes and are never stored or logged.
+
 ## Who can run what
 
 Threads started through the `t3` CLI use the project's default permission mode, which is Full access

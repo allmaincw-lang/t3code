@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { mintLiveKitToken, readLiveKitConfig } from "./livekit.ts";
+import { handleVoice, VoiceError, voiceConfigFromEnv, type VoiceConfig } from "./voice.ts";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const MAX_BODY_BYTES = 64 * 1024;
@@ -15,6 +16,7 @@ const AGENT_STATUSES = new Set(["idle", "working", "needs-approval", "error"]);
 const STATIC_FILES: Record<string, { file: string; type: string }> = {
   "/": { file: "public/index.html", type: "text/html; charset=utf-8" },
   "/app.js": { file: "public/app.js", type: "text/javascript; charset=utf-8" },
+  "/voice.js": { file: "public/voice.js", type: "text/javascript; charset=utf-8" },
   "/style.css": { file: "public/style.css", type: "text/css; charset=utf-8" },
   "/livekit-call.js": { file: "public/livekit-call.js", type: "text/javascript; charset=utf-8" },
   "/vendor/livekit-client-2.22.4.umd.js": {
@@ -134,7 +136,10 @@ const livekitOrigins = () => {
   }
 };
 
-export const createRoomServer = (dataDir: string): Server => {
+export const createRoomServer = (
+  dataDir: string,
+  voiceConfig: VoiceConfig = voiceConfigFromEnv(),
+): Server => {
   mkdirSync(dataDir, { recursive: true });
   const logPath = join(dataDir, "events.jsonl");
   const messages: Message[] = [];
@@ -277,6 +282,8 @@ export const createRoomServer = (dataDir: string): Server => {
       openStream(req, res, person, url);
       return undefined;
     }
+    const voice = await handleVoice(voiceConfig, route, req);
+    if (voice !== undefined) return voice;
     if (req.method !== "POST") throw new HttpError(404, "Not found.");
     const body = await readBody(req);
 
@@ -399,7 +406,8 @@ export const createRoomServer = (dataDir: string): Server => {
         res.end(JSON.stringify(result));
       }
     })().catch((error: unknown) => {
-      const status = error instanceof HttpError ? error.status : 500;
+      const known = error instanceof HttpError || error instanceof VoiceError;
+      const status = known ? error.status : 500;
       if (status === 500) console.error(error);
       if (res.headersSent) {
         res.end();
@@ -407,7 +415,7 @@ export const createRoomServer = (dataDir: string): Server => {
       }
       res.writeHead(status, { "content-type": "application/json" });
       res.end(
-        JSON.stringify({ error: error instanceof HttpError ? error.message : "Server error." }),
+        JSON.stringify({ error: known ? error.message : "Server error." }),
       );
     });
   });
