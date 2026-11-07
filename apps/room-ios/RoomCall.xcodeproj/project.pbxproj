@@ -1,0 +1,66 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+		C5D4C4DDB8F9CB91ADE040E2 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RoomCallApp.swift"; sourceTree = "<group>"; };
+		15F775A207635BFE2304083A = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Keychain.swift"; sourceTree = "<group>"; };
+		B19B9E2DADB8584FBAF68997 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Invite.swift"; sourceTree = "<group>"; };
+		31AAFF59F6B5F336E26B43C7 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TokenClient.swift"; sourceTree = "<group>"; };
+		CF03706562C80AD03189F76E = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SessionModel.swift"; sourceTree = "<group>"; };
+		E63956D4B0DBC5C8917DA0FD = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SignInView.swift"; sourceTree = "<group>"; };
+		C2E63AE8B9E9F3B10E634BC4 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CallModel.swift"; sourceTree = "<group>"; };
+		28B80CCBA5EF1A30CA8F290B = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CallView.swift"; sourceTree = "<group>"; };
+		C20721A4F9C74C3C71C0FB70 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SampleHandler.swift"; sourceTree = "<group>"; };
+		E96D4E912D3A12677C99FD96 = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
+		D85B08FA62AAE0F4835D0D6E = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
+		25C32D85C40C971AF5196791 = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "RoomCall.entitlements"; sourceTree = "<group>"; };
+		832C8435F858507C812C5123 = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "BroadcastExtension.entitlements"; sourceTree = "<group>"; };
+		E44BEB9A9D807E4333EE1B62 = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Config.xcconfig"; sourceTree = "<group>"; };
+		9F175B98D7516620A7EFC3FA = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RoomCall.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		39B0A34212F3870892D60A7C = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BroadcastExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A46A1BCE0B67C45BEC8F435B = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/livekit/client-sdk-swift.git"; requirement = {kind = exactVersion; version = 2.4.0; }; };
+		A6EA10C2C5E90FE4FEB39E30 = {isa = XCSwiftPackageProductDependency; package = A46A1BCE0B67C45BEC8F435B; productName = LiveKit; };
+		E2A4B4887DC7EA94E3A194AD = {isa = XCSwiftPackageProductDependency; package = A46A1BCE0B67C45BEC8F435B; productName = LiveKit; };
+		11A0CCDB109406DBB3F6AF17 = {isa = PBXBuildFile; fileRef = C5D4C4DDB8F9CB91ADE040E2; };
+		F0C03FFC7E8808C28B230AF8 = {isa = PBXBuildFile; fileRef = 15F775A207635BFE2304083A; };
+		B1A4CAF55E6F46591A7DC370 = {isa = PBXBuildFile; fileRef = B19B9E2DADB8584FBAF68997; };
+		2BD524D20D7D1ECCC6C0A327 = {isa = PBXBuildFile; fileRef = 31AAFF59F6B5F336E26B43C7; };
+		E558C2E890CAAF76DBE06066 = {isa = PBXBuildFile; fileRef = CF03706562C80AD03189F76E; };
+		B5F2FFFC1A908427D2FDA706 = {isa = PBXBuildFile; fileRef = E63956D4B0DBC5C8917DA0FD; };
+		9683A12F12328DB7C6651C7C = {isa = PBXBuildFile; fileRef = C2E63AE8B9E9F3B10E634BC4; };
+		0C50FD50B79DB5603B5A5074 = {isa = PBXBuildFile; fileRef = 28B80CCBA5EF1A30CA8F290B; };
+		A7FFDD88526BBF7A0F5508E3 = {isa = PBXBuildFile; fileRef = C20721A4F9C74C3C71C0FB70; };
+		2A04615BEF5BD637AE3D5D24 = {isa = PBXBuildFile; productRef = A6EA10C2C5E90FE4FEB39E30; };
+		9371B89E6F3E41575AFC3D38 = {isa = PBXBuildFile; productRef = E2A4B4887DC7EA94E3A194AD; };
+		941D6996CEEDC897A5C19B2C = {isa = PBXBuildFile; fileRef = 39B0A34212F3870892D60A7C; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		91E9F5125336555B232C5C2F = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (11A0CCDB109406DBB3F6AF17, F0C03FFC7E8808C28B230AF8, B1A4CAF55E6F46591A7DC370, 2BD524D20D7D1ECCC6C0A327, E558C2E890CAAF76DBE06066, B5F2FFFC1A908427D2FDA706, 9683A12F12328DB7C6651C7C, 0C50FD50B79DB5603B5A5074); runOnlyForDeploymentPostprocessing = 0; };
+		325EDCB13E0F84C33EBC06B5 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (2A04615BEF5BD637AE3D5D24); runOnlyForDeploymentPostprocessing = 0; };
+		E78AC6FAADFA3B55E36B6F8A = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		9117519702BA94E41DD32556 = {isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = ""; dstSubfolderSpec = 13; name = "Embed Foundation Extensions"; files = (941D6996CEEDC897A5C19B2C); runOnlyForDeploymentPostprocessing = 0; };
+		9F07FF5ABE246F4A22E7E253 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A7FFDD88526BBF7A0F5508E3); runOnlyForDeploymentPostprocessing = 0; };
+		E7125C725AF6E18691D997A6 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (9371B89E6F3E41575AFC3D38); runOnlyForDeploymentPostprocessing = 0; };
+		72518CA67434174925E78FF4 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		06125DCB1954C4F7EEE69894 = {isa = XCBuildConfiguration; baseConfigurationReference = E44BEB9A9D807E4333EE1B62; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1"; MARKETING_VERSION = 1.0; CURRENT_PROJECT_VERSION = 1; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; ONLY_ACTIVE_ARCH = YES; DEBUG_INFORMATION_FORMAT = dwarf; }; name = Debug; };
+		AACF5BDB2BC481EB947517D5 = {isa = XCBuildConfiguration; baseConfigurationReference = E44BEB9A9D807E4333EE1B62; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1"; MARKETING_VERSION = 1.0; CURRENT_PROJECT_VERSION = 1; SWIFT_COMPILATION_MODE = wholemodule; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; VALIDATE_PRODUCT = YES; }; name = Release; };
+		C0DD1C3E4BFC124D878FE440 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = NO; SWIFT_EMIT_LOC_STRINGS = YES; INFOPLIST_FILE = RoomCall/Info.plist; CODE_SIGN_ENTITLEMENTS = RoomCall/RoomCall.entitlements; PRODUCT_BUNDLE_IDENTIFIER = "$(ROOM_APP_BUNDLE_ID)"; PRODUCT_NAME = "$(TARGET_NAME)"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; }; name = Debug; };
+		699FCDBED06EC64C8A6B513F = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = NO; SWIFT_EMIT_LOC_STRINGS = YES; INFOPLIST_FILE = RoomCall/Info.plist; CODE_SIGN_ENTITLEMENTS = RoomCall/RoomCall.entitlements; PRODUCT_BUNDLE_IDENTIFIER = "$(ROOM_APP_BUNDLE_ID)"; PRODUCT_NAME = "$(TARGET_NAME)"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; }; name = Release; };
+		A1E63E9AED7999182E6042AA = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = NO; SWIFT_EMIT_LOC_STRINGS = YES; INFOPLIST_FILE = BroadcastExtension/Info.plist; CODE_SIGN_ENTITLEMENTS = BroadcastExtension/BroadcastExtension.entitlements; PRODUCT_BUNDLE_IDENTIFIER = "$(ROOM_APP_BUNDLE_ID).broadcast"; PRODUCT_NAME = "$(TARGET_NAME)"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"; APPLICATION_EXTENSION_API_ONLY = YES; SKIP_INSTALL = YES; }; name = Debug; };
+		7E3B7AEEBF5BFFC2BAF4F768 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = NO; SWIFT_EMIT_LOC_STRINGS = YES; INFOPLIST_FILE = BroadcastExtension/Info.plist; CODE_SIGN_ENTITLEMENTS = BroadcastExtension/BroadcastExtension.entitlements; PRODUCT_BUNDLE_IDENTIFIER = "$(ROOM_APP_BUNDLE_ID).broadcast"; PRODUCT_NAME = "$(TARGET_NAME)"; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"; APPLICATION_EXTENSION_API_ONLY = YES; SKIP_INSTALL = YES; }; name = Release; };
+		6274E0C0E588DD8101015FC3 = {isa = XCConfigurationList; buildConfigurations = (06125DCB1954C4F7EEE69894, AACF5BDB2BC481EB947517D5); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		A3916763AE9CB67624F00ECC = {isa = XCConfigurationList; buildConfigurations = (C0DD1C3E4BFC124D878FE440, 699FCDBED06EC64C8A6B513F); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		169B83F2842B24B5733F5B7B = {isa = XCConfigurationList; buildConfigurations = (A1E63E9AED7999182E6042AA, 7E3B7AEEBF5BFFC2BAF4F768); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		DB17252C0CE8A27B19DD7E90 = {isa = PBXNativeTarget; buildConfigurationList = 169B83F2842B24B5733F5B7B; buildPhases = (9F07FF5ABE246F4A22E7E253, E7125C725AF6E18691D997A6, 72518CA67434174925E78FF4); buildRules = (); dependencies = (); name = BroadcastExtension; packageProductDependencies = (E2A4B4887DC7EA94E3A194AD); productName = BroadcastExtension; productReference = 39B0A34212F3870892D60A7C; productType = "com.apple.product-type.app-extension"; };
+		431387EB7262E1CFC79B125E = {isa = PBXContainerItemProxy; containerPortal = 46F86FAA6BBF9AC94A7E4595; proxyType = 1; remoteGlobalIDString = DB17252C0CE8A27B19DD7E90; remoteInfo = BroadcastExtension; };
+		2254342BECCEAFBD04538E0A = {isa = PBXTargetDependency; target = DB17252C0CE8A27B19DD7E90; targetProxy = 431387EB7262E1CFC79B125E; };
+		F818D004285DD7DD31835979 = {isa = PBXNativeTarget; buildConfigurationList = A3916763AE9CB67624F00ECC; buildPhases = (91E9F5125336555B232C5C2F, 325EDCB13E0F84C33EBC06B5, E78AC6FAADFA3B55E36B6F8A, 9117519702BA94E41DD32556); buildRules = (); dependencies = (2254342BECCEAFBD04538E0A); name = RoomCall; packageProductDependencies = (A6EA10C2C5E90FE4FEB39E30); productName = RoomCall; productReference = 9F175B98D7516620A7EFC3FA; productType = "com.apple.product-type.application"; };
+		0BE22E29474101102732C952 = {isa = PBXGroup; children = (C5D4C4DDB8F9CB91ADE040E2, 15F775A207635BFE2304083A, B19B9E2DADB8584FBAF68997, 31AAFF59F6B5F336E26B43C7, CF03706562C80AD03189F76E, E63956D4B0DBC5C8917DA0FD, C2E63AE8B9E9F3B10E634BC4, 28B80CCBA5EF1A30CA8F290B, E96D4E912D3A12677C99FD96, 25C32D85C40C971AF5196791); path = RoomCall; sourceTree = "<group>"; };
+		91603439185F727D2B47D53C = {isa = PBXGroup; children = (C20721A4F9C74C3C71C0FB70, D85B08FA62AAE0F4835D0D6E, 832C8435F858507C812C5123); path = BroadcastExtension; sourceTree = "<group>"; };
+		070F258760FAB4E9EF0D9C2A = {isa = PBXGroup; children = (9F175B98D7516620A7EFC3FA, 39B0A34212F3870892D60A7C); sourceTree = "<group>"; };
+		A45C494344EA780B34B0A189 = {isa = PBXGroup; children = (E44BEB9A9D807E4333EE1B62, 0BE22E29474101102732C952, 91603439185F727D2B47D53C, 070F258760FAB4E9EF0D9C2A); sourceTree = "<group>"; };
+		46F86FAA6BBF9AC94A7E4595 = {isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1520; LastUpgradeCheck = 1520; }; buildConfigurationList = 6274E0C0E588DD8101015FC3; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base, ); mainGroup = A45C494344EA780B34B0A189; packageReferences = (A46A1BCE0B67C45BEC8F435B); productRefGroup = 070F258760FAB4E9EF0D9C2A; projectDirPath = ""; projectRoot = ""; targets = (F818D004285DD7DD31835979, DB17252C0CE8A27B19DD7E90); };
+	};
+	rootObject = 46F86FAA6BBF9AC94A7E4595;
+}
