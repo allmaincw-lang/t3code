@@ -58,10 +58,18 @@ Limits of a free personal team:
 
 ```bash
 cd apps/room-ios
+GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/usr/bin/true SSH_ASKPASS=/usr/bin/true \
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild build \
   -project RoomCall.xcodeproj -scheme RoomCall \
   -destination 'platform=iOS Simulator,name=iPhone 15' \
-  -derivedDataPath build/dd CODE_SIGNING_ALLOWED=NO
+  -derivedDataPath build/dd -clonedSourcePackagesDirPath build/spm \
+  -scmProvider system -disableAutomaticPackageResolution \
+  CODE_SIGNING_ALLOWED=NO
 ```
+
+All packages are public HTTPS repositories; no GitHub or keychain sign-in is
+needed. `-disableAutomaticPackageResolution` makes the build fail instead of
+downloading anything, so the packages must already be in `build/spm` (a first
+checkout has to resolve them once, with network and `-scmProvider system`).
 
 Screen sharing and real media do not work in the Simulator; use it to check the UI.
