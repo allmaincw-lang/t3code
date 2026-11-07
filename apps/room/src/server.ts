@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { mintLiveKitToken, readLiveKitConfig } from "./livekit.ts";
 import { handleVoice, VoiceError, voiceConfigFromEnv, type VoiceConfig } from "./voice.ts";
 import { createMeeting } from "./meeting.ts";
+import { parseRemember } from "./memory.ts";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const MAX_BODY_BYTES = 64 * 1024;
@@ -25,6 +26,8 @@ const STATIC_FILES: Record<string, { file: string; type: string }> = {
     type: "text/javascript; charset=utf-8",
   },
   "/meeting.js": { file: "public/meeting.js", type: "text/javascript; charset=utf-8" },
+  "/jarvis.js": { file: "public/jarvis.js", type: "text/javascript; charset=utf-8" },
+  "/jarvis.css": { file: "public/jarvis.css", type: "text/css; charset=utf-8" },
 };
 
 type Message = {
@@ -52,6 +55,9 @@ type Agent = {
   task: string | null;
   link: string | null;
   online: boolean;
+  // Jarvis memory: the machine can store notes, and its owner switched it on.
+  memoryAvailable: boolean;
+  memoryOn: boolean;
 };
 type Connection = {
   id: string;
@@ -148,6 +154,7 @@ export const createRoomServer = (
   const dispatches = new Map<string, Dispatch>();
   const agents = new Map<string, Agent>();
   const connections = new Map<string, Connection>();
+  const memoryOn = new Set<string>();
 
   if (existsSync(logPath)) {
     for (const line of readFileSync(logPath, "utf8").split("\n")) {
@@ -155,6 +162,10 @@ export const createRoomServer = (
       const entry = JSON.parse(line);
       if (entry.type === "message") messages.push(entry.message);
       if (entry.type === "dispatch") dispatches.set(entry.dispatch.id, entry.dispatch);
+      if (entry.type === "memory") {
+        if (entry.enabled) memoryOn.add(entry.agent);
+        else memoryOn.delete(entry.agent);
+      }
     }
   }
 
@@ -212,6 +223,30 @@ export const createRoomServer = (
     dispatch.status = "delivered";
     saveDispatch(dispatch);
     send(connector, "run", dispatch);
+  };
+
+  // "remember: ..." from an agent's owner is a note for that agent, not a request to run it.
+  const routeRemember = (from: string, text: string): boolean => {
+    const parsed = parseRemember(text);
+    if (!parsed) return false;
+    const owned = [...agents.values()].filter((agent) => agent.owner === from);
+    const targets =
+      parsed.mentions.length > 0
+        ? owned.filter((agent) => parsed.mentions.includes(agentKey(agent.name)))
+        : owned.filter((agent) => agent.memoryOn);
+    if (targets.length === 0) return false;
+    for (const agent of targets) {
+      const connector = connectorFor(agent);
+      if (!agent.memoryOn) {
+        addMessage(agent.name, "system", `Memory is off for ${agent.name}. Turn it on in the Jarvis panel first.`);
+      } else if (!connector) {
+        addMessage(agent.name, "system", `${agent.name} is offline, so that note was not saved.`);
+      } else {
+        send(connector, "remember", { agent: agent.name, by: from, text: parsed.note });
+        addMessage(agent.name, "system", `Saved to ${agent.name}'s memory.`);
+      }
+    }
+    return true;
   };
 
   const routeMentions = (from: string, text: string) => {
@@ -301,7 +336,7 @@ export const createRoomServer = (
     if (route === "POST /api/messages") {
       const text = requireText(body.text, "text");
       const message = addMessage(person, "person", text);
-      routeMentions(person, text);
+      if (!routeRemember(person, text)) routeMentions(person, text);
       return { id: message.id };
     }
     if (route === "POST /api/livekit/token") {
@@ -350,6 +385,8 @@ export const createRoomServer = (
           task: optionalText(input.task, 200),
           link: httpLink(input.link),
           online: true,
+          memoryAvailable: input.memory === true,
+          memoryOn: memoryOn.has(agentKey(name)) && input.memory === true,
         };
         agents.set(agentKey(name), agent);
         broadcast("agent", agent);
@@ -358,6 +395,25 @@ export const createRoomServer = (
         }
       }
       for (const dispatch of dispatches.values()) deliver(dispatch);
+      return { ok: true };
+    }
+
+    const memory = /^POST \/api\/agents\/([^/]+)\/memory$/.exec(route);
+    if (memory) {
+      const agent = agents.get(agentKey(decodeURIComponent(memory[1]!)));
+      if (!agent) throw new HttpError(404, "Unknown agent.");
+      if (agent.owner !== person) throw new HttpError(403, `Only ${agent.owner} can do that.`);
+      if (!agent.memoryAvailable) {
+        throw new HttpError(409, "That machine has no memory folder configured.");
+      }
+      agent.memoryOn = body.enabled === true;
+      if (agent.memoryOn) memoryOn.add(agentKey(agent.name));
+      else memoryOn.delete(agentKey(agent.name));
+      appendFileSync(
+        logPath,
+        `${JSON.stringify({ type: "memory", agent: agentKey(agent.name), enabled: agent.memoryOn })}\n`,
+      );
+      broadcast("agent", agent);
       return { ok: true };
     }
 
