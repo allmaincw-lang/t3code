@@ -6,6 +6,14 @@ const element = (tag, className, text) => {
   return node;
 };
 
+// Read-only call state for other modules. Covers LiveKit calls only; the mesh fallback leaves it unjoined.
+// `window.roomCall` = { joined, micOn, cameraOn, screenOn }; `roomcall:change` fires on window after any change.
+const publish = (state) => {
+  window.roomCall = Object.freeze({ joined: false, micOn: false, cameraOn: false, screenOn: false, ...state });
+  window.dispatchEvent(new CustomEvent("roomcall:change", { detail: window.roomCall }));
+};
+publish({});
+
 export const joinLiveKitCall = async ({ url, token, onChange, notify }) => {
   const { Room, RoomEvent, Track } = window.LivekitClient;
   const room = new Room({ adaptiveStream: true, dynacast: true });
@@ -80,6 +88,13 @@ export const joinLiveKitCall = async ({ url, token, onChange, notify }) => {
       showVideo(entry, null);
       tiles.delete(key);
     }
+    const me = room.localParticipant;
+    publish({
+      joined: room.state === "connected",
+      micOn: me.isMicrophoneEnabled,
+      cameraOn: me.isCameraEnabled,
+      screenOn: me.isScreenShareEnabled,
+    });
     onChange();
   };
 
@@ -162,6 +177,7 @@ export const joinLiveKitCall = async ({ url, token, onChange, notify }) => {
       for (const entry of tiles.values()) showVideo(entry, null);
       tiles.clear();
       audioHost.remove();
+      publish({});
     },
   };
 };

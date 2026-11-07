@@ -289,7 +289,7 @@ export const createRoomServer = (dataDir: string): Server => {
     if (route === "POST /api/livekit/token") {
       const config = readLiveKitConfig();
       if (!config) throw new HttpError(503, "Video calls are not set up on this room.");
-      const room = "room";
+      const room = process.env.ROOM_LIVEKIT_ROOM || "room";
       return { url: config.url, token: mintLiveKitToken(config, room, person), room };
     }
     if (route === "POST /api/call") {
