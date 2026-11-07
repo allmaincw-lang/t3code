@@ -176,6 +176,10 @@ const renderGrid = () => {
       ...[...state.agents.values()].map(agentTile),
     ];
     grid.replaceChildren(...nodes);
+    // Safari pauses a video that is detached during replaceChildren and does not resume it.
+    for (const video of grid.querySelectorAll("video")) {
+      if (video.paused) video.play().catch(() => {});
+    }
     $("status").textContent = `${state.connections.length} here, ${[...state.agents.values()].filter((a) => a.online).length} agents online`;
     return;
   }

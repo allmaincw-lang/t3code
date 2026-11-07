@@ -49,6 +49,7 @@ export const joinLiveKitCall = async ({ url, token, onChange, notify }) => {
     if (track) {
       entry.video = document.createElement("video");
       entry.video.playsInline = true;
+      entry.video.autoplay = true;
       entry.video.muted = true;
       track.attach(entry.video);
       entry.node.prepend(entry.video);
@@ -70,6 +71,7 @@ export const joinLiveKitCall = async ({ url, token, onChange, notify }) => {
       showVideo(entry, camera && !camera.isMuted ? camera.track : null);
       entry.initial.textContent = label.slice(0, 1).toUpperCase();
       entry.name.textContent = isLocal ? `${label} (you)` : label;
+      entry.node.classList.toggle("self", isLocal);
       entry.muted.hidden = !!mic && !mic.isMuted;
       entry.node.classList.toggle("speaking", person.isSpeaking);
 

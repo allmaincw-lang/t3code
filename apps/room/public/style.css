@@ -150,6 +150,10 @@ button[aria-pressed="true"] {
   background: #000;
 }
 
+.tile.self video {
+  transform: scaleX(-1);
+}
+
 .tile.speaking {
   border-color: var(--ok);
   box-shadow: 0 0 0 2px var(--ok);
