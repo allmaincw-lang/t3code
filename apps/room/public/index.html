@@ -4,12 +4,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Room</title>
-    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <main id="signed-out" class="signed-out" hidden>
+    <main id="signed-out" class="signed-out">
       <h1>Room</h1>
-      <p>Open your invite link to join. Ask the room's host to create one for you.</p>
+      <p id="signed-out-text" role="status">Connecting to the room...</p>
     </main>
 
     <div id="app" class="app" hidden>
@@ -45,6 +45,6 @@
         </form>
       </aside>
     </div>
-    <script src="/app.js" type="module"></script>
+    <script src="app.js" type="module"></script>
   </body>
 </html>

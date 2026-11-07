@@ -347,6 +347,10 @@ export const createRoomServer = (dataDir: string): Server => {
 
   return createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://room.local");
+    if (process.env.ROOM_LOG) {
+      const agent = (req.headers["user-agent"] ?? "").slice(0, 60);
+      console.log(`${req.method} ${url.pathname} from ${req.headers["x-forwarded-for"] ?? "local"} ${agent}`);
+    }
     const asset = req.method === "GET" ? STATIC_FILES[url.pathname] : undefined;
     if (asset) {
       res.writeHead(200, {

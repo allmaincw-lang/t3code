@@ -6,7 +6,9 @@
       "name": "codex",
       "project": "<project id from t3 project add>",
       "provider": "codex",
-      "model": "gpt-6.1-sol"
+      "model": "gpt-6.1-sol",
+      "worktree": "main",
+      "branch": "room/codex"
     }
   ]
 }

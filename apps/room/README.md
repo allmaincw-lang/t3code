@@ -29,6 +29,10 @@ ROOM_TOKEN=<that person's connector token> node src/connector.ts connector.local
 Find project ids in the output of `t3 project add <path>`. `room` is the room's address as this
 machine reaches it.
 
+To keep agents from overwriting each other, give each one its own `worktree` (the branch, tag, or
+commit to start from) and `branch` (the new branch it works on). Worktrees start from committed code,
+so they do not include uncommitted changes in the project folder.
+
 ## Use it with other people
 
 Everyone must be on the same tailnet. On the host, publish the room over HTTPS, because browsers only
@@ -38,6 +42,15 @@ allow cameras on HTTPS or localhost:
 ROOM_URL=https://<host>.<tailnet>.ts.net node src/server.ts invite "Partner"
 tailscale serve --bg 4780
 ```
+
+If another app already uses that address, publish the room under a path and add it to `ROOM_URL`,
+with a trailing slash:
+
+```bash
+tailscale serve --bg --set-path=/room http://127.0.0.1:4780
+```
+
+Tailnet access rules must allow the port. A rule that only allows 443 blocks any other HTTPS port.
 
 ## Who can run what
 

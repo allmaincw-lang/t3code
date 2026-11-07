@@ -16,6 +16,8 @@ type AgentConfig = {
   provider: string;
   model: string;
   baseDir?: string;
+  worktree?: string;
+  branch?: string;
 };
 type Config = { room: string; machine: string; t3?: string; agents: AgentConfig[] };
 type Dispatch = { id: string; agent: string; from: string; text: string; approvedBy: string | null };
@@ -110,6 +112,8 @@ const runDispatch = async (state: AgentState, dispatch: Dispatch) => {
       agent.provider,
       "--model",
       agent.model,
+      ...(agent.worktree ? ["--worktree", agent.worktree] : []),
+      ...(agent.branch ? ["--branch", agent.branch] : []),
     ]);
     state.threadId = started.threadId as string;
     saved[agent.name] = state.threadId;

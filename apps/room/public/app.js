@@ -42,7 +42,7 @@ const call = {
 };
 
 const api = async (path, body) => {
-  const res = await fetch(path, {
+  const res = await fetch(`.${path}`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -83,7 +83,15 @@ const renderApprovals = () => {
   const box = $("approvals");
   box.replaceChildren();
   for (const dispatch of state.dispatches.values()) {
-    if (dispatch.status !== "pending" || dispatch.owner !== state.me) continue;
+    if (dispatch.status !== "pending") continue;
+    if (dispatch.owner !== state.me) {
+      if (dispatch.from === state.me) {
+        box.append(
+          element("div", "approval muted", `Waiting for ${dispatch.owner} to approve ${dispatch.agent}.`),
+        );
+      }
+      continue;
+    }
     const row = element("div", "approval");
     row.append(
       element("div", null, `${dispatch.from} wants ${dispatch.agent} to run on your machine:`),
@@ -329,8 +337,9 @@ const handleEvent = async (type, data) => {
 };
 
 const connect = async () => {
-  const res = await fetch("/api/events", { headers: { authorization: `Bearer ${token}` } });
+  const res = await fetch("./api/events", { headers: { authorization: `Bearer ${token}` } });
   if (res.status === 401) {
+    $("signed-out-text").textContent = "This invite is not valid. Ask the room's host for a new one.";
     $("signed-out").hidden = false;
     $("app").hidden = true;
     return false;
@@ -355,11 +364,15 @@ const connect = async () => {
 
 const run = async () => {
   if (!token) {
-    $("signed-out").hidden = false;
+    $("signed-out-text").textContent =
+      "Open your invite link to join. Ask the room's host to create one for you.";
     return;
   }
   while (true) {
-    const reconnect = await connect().catch(() => true);
+    const reconnect = await connect().catch((error) => {
+      $("signed-out-text").textContent = `Could not reach the room: ${error.message}. Retrying...`;
+      return true;
+    });
     if (!reconnect) return;
     if (call.active) await leaveCall().catch(() => {});
     notify("Disconnected from the room. Reconnecting...");
