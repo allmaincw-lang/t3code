@@ -25,8 +25,17 @@
         </div>
       </header>
 
+      <nav id="meetbar" class="meetbar" aria-label="Meeting">
+        <button id="hand" type="button" aria-pressed="false">Raise hand</button>
+        <div id="reactions" class="reactions" role="group" aria-label="Reactions"></div>
+        <button id="people-toggle" type="button" aria-expanded="false" aria-controls="people">People</button>
+        <button id="chat-jump" type="button" class="badge-button" hidden></button>
+        <button id="approval-jump" type="button" class="badge-button warn" hidden></button>
+      </nav>
+
       <section class="stage" aria-label="People and agents">
         <div id="notice" class="notice" hidden></div>
+        <section id="people" class="people" aria-label="Participants" hidden></section>
         <div id="grid" class="grid"></div>
       </section>
 
@@ -48,5 +57,6 @@
     </div>
     <script src="vendor/livekit-client-2.22.4.umd.js"></script>
     <script src="app.js" type="module"></script>
+    <script src="meeting.js" type="module"></script>
   </body>
 </html>

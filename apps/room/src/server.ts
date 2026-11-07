@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { mintLiveKitToken, readLiveKitConfig } from "./livekit.ts";
 import { handleVoice, VoiceError, voiceConfigFromEnv, type VoiceConfig } from "./voice.ts";
+import { createMeeting } from "./meeting.ts";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const MAX_BODY_BYTES = 64 * 1024;
@@ -23,6 +24,7 @@ const STATIC_FILES: Record<string, { file: string; type: string }> = {
     file: "public/vendor/livekit-client-2.22.4.umd.js",
     type: "text/javascript; charset=utf-8",
   },
+  "/meeting.js": { file: "public/meeting.js", type: "text/javascript; charset=utf-8" },
 };
 
 type Message = {
@@ -167,6 +169,13 @@ export const createRoomServer = (
       .filter((conn) => conn.kind === "browser")
       .map(({ id, person, inCall }) => ({ id, person, inCall }));
   const broadcastPresence = () => broadcast("presence", publicConnections());
+  const meeting = createMeeting({
+    broadcast,
+    find: (id) => (typeof id === "string" ? connections.get(id) : undefined),
+    fail: (status, message) => {
+      throw new HttpError(status, message);
+    },
+  });
   const agentKey = (name: string) => name.toLowerCase();
 
   const addMessage = (author: string, kind: Message["kind"], text: string) => {
@@ -252,12 +261,14 @@ export const createRoomServer = (
       dispatches: [...dispatches.values()].slice(-HISTORY_LIMIT),
       agents: [...agents.values()],
       connections: publicConnections(),
+      meeting: meeting.snapshot(),
     });
     if (conn.kind === "browser") broadcastPresence();
     const heartbeat = setInterval(() => send(conn, "ping", null), HEARTBEAT_MS);
     req.on("close", () => {
       clearInterval(heartbeat);
       connections.delete(conn.id);
+      meeting.disconnected(conn.id);
       if (conn.kind === "browser") {
         broadcastPresence();
         return;
@@ -303,9 +314,12 @@ export const createRoomServer = (
       const conn = connections.get(requireText(body.connectionId, "connectionId"));
       if (!conn || conn.person !== person) throw new HttpError(404, "Unknown connection.");
       conn.inCall = body.inCall === true;
+      if (!conn.inCall) meeting.leftCall(conn.id);
       broadcastPresence();
       return { ok: true };
     }
+    const meetingResult = meeting.handle(route, body, person);
+    if (meetingResult !== undefined) return meetingResult;
     if (route === "POST /api/signal") {
       const from = connections.get(requireText(body.from, "from"));
       const to = connections.get(requireText(body.to, "to"));

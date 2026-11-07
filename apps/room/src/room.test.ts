@@ -286,3 +286,72 @@ test("speech is forwarded to T3 with its framing and key, and kept private", asy
     await new Promise((resolve) => t3.close(resolve));
   }
 });
+
+test("meeting actions use the invite's identity and own connection", async () => {
+  const mine = await openEvents(owner);
+  const { connectionId } = await mine.next("snapshot");
+  const watcher = await openEvents(guest);
+  await watcher.next("snapshot");
+
+  assert.equal((await post(guest, "/api/meeting", { connectionId, hand: true })).status, 404);
+  assert.equal((await post(guest, "/api/react", { connectionId, emoji: "👍" })).status, 404);
+  assert.equal((await post(owner, "/api/meeting", { connectionId: "nope", hand: true })).status, 404);
+
+  assert.equal((await post(owner, "/api/meeting", { connectionId, hand: true, person: "Partner" })).status, 200);
+  const raised = await watcher.next("meeting");
+  assert.deepEqual(raised.filter((entry: { hand: boolean }) => entry.hand).map((e: { id: string }) => e.id), [connectionId]);
+
+  await post(owner, "/api/react", { connectionId, emoji: "🎉", person: "Partner" });
+  const reaction = await watcher.next("reaction");
+  assert.deepEqual(reaction, { connectionId, person: "Chase", emoji: "🎉" });
+
+  assert.equal((await post(owner, "/api/meeting", { connectionId, hand: false })).status, 200);
+  const lowered = await watcher.next("meeting");
+  assert.equal(lowered.some((entry: { id: string }) => entry.id === connectionId), false);
+});
+
+test("hands clear when someone disconnects", async () => {
+  const leaver = new AbortController();
+  openStreams.push(leaver);
+  const res = await fetch(`${base}/api/events`, {
+    headers: { authorization: `Bearer ${guest}` },
+    signal: leaver.signal,
+  });
+  const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader();
+  const first = JSON.parse((await reader.read()).value!.split("\n")[0]!);
+  const id = first.data.connectionId;
+  const watcher = await openEvents(owner);
+  await watcher.next("snapshot");
+
+  await post(guest, "/api/meeting", { connectionId: id, hand: true });
+  assert.equal((await watcher.next("meeting")).some((e: { id: string }) => e.id === id), true);
+  leaver.abort();
+  assert.equal((await watcher.next("meeting")).some((e: { id: string }) => e.id === id), false);
+  const fresh = await openEvents(owner);
+  assert.equal((await fresh.next("snapshot")).meeting.some((e: { id: string }) => e.id === id), false);
+});
+
+test("leaving the call lowers the hand and clears mute", async () => {
+  const mine = await openEvents(owner);
+  const { connectionId } = await mine.next("snapshot");
+  await post(owner, "/api/meeting", { connectionId, muted: true });
+  assert.equal((await mine.next("meeting")).length, 0, "mute is ignored outside a call");
+  await post(owner, "/api/call", { connectionId, inCall: true });
+  await post(owner, "/api/meeting", { connectionId, hand: true, muted: true });
+  const inCall = (await mine.next("meeting")).find((e: { id: string }) => e.id === connectionId);
+  assert.deepEqual(inCall, { id: connectionId, hand: true, muted: true });
+  await post(owner, "/api/call", { connectionId, inCall: false });
+  assert.deepEqual(await mine.next("meeting"), []);
+});
+
+test("reaction and hand input is validated", async () => {
+  const mine = await openEvents(owner);
+  const { connectionId } = await mine.next("snapshot");
+  for (const emoji of ["<script>", "", 7, null, "👍👍", "🖕"]) {
+    assert.equal((await post(owner, "/api/react", { connectionId, emoji })).status, 400, String(emoji));
+  }
+  assert.equal((await post(owner, "/api/meeting", { connectionId, hand: "yes" })).status, 400);
+  assert.equal((await post(owner, "/api/meeting", { connectionId, muted: 1 })).status, 400);
+  assert.equal((await post(owner, "/api/react", { connectionId, emoji: "👏" })).status, 200);
+  assert.equal((await post(owner, "/api/react", { connectionId, emoji: "👏" })).status, 429);
+});

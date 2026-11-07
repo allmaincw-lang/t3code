@@ -353,7 +353,10 @@ const toggleTrack = (button, tracks, onLabel, offLabel) => {
   button.setAttribute("aria-pressed", String(!enabled));
 };
 
+// meeting.js listens here and reads the same state; it never writes to it.
+window.room = { state, call, api };
 const handleEvent = async (type, data) => {
+  document.dispatchEvent(new CustomEvent("room-event", { detail: { type, data } }));
   if (type === "snapshot") {
     state.me = data.me;
     state.connectionId = data.connectionId;

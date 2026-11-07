@@ -47,8 +47,8 @@ body {
 
 .app {
   display: grid;
-  grid-template: auto minmax(0, 1fr) / minmax(0, 1fr) 360px;
-  grid-template-areas: "top top" "stage chat";
+  grid-template: auto auto minmax(0, 1fr) / minmax(0, 1fr) 360px;
+  grid-template-areas: "top top" "meet meet" "stage chat";
   height: 100dvh;
 }
 
@@ -309,8 +309,8 @@ button[aria-pressed="true"] {
 
 @media (max-width: 800px) {
   .app {
-    grid-template: auto minmax(0, 1fr) minmax(0, 1fr) / minmax(0, 1fr);
-    grid-template-areas: "top" "stage" "chat";
+    grid-template: auto auto minmax(0, 1fr) minmax(0, 1fr) / minmax(0, 1fr);
+    grid-template-areas: "top" "meet" "stage" "chat";
   }
 
   .chat {
@@ -320,5 +320,102 @@ button[aria-pressed="true"] {
 
   .grid {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}
+
+/* Meeting extras */
+.meetbar {
+  grid-area: meet;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.reactions {
+  display: flex;
+  gap: 4px;
+}
+
+.reaction-button {
+  min-width: 36px;
+  padding: 0 6px;
+  font-size: 18px;
+}
+
+.badge-button {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.badge-button.warn {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.people {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.people-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.person {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.person:last-child {
+  border-bottom: 0;
+}
+
+.person-name {
+  font-weight: 600;
+}
+
+.hand-flag {
+  margin-left: auto;
+  color: var(--warn);
+}
+
+.tile-meeting {
+  position: absolute;
+  inset: 8px 8px auto auto;
+  display: flex;
+  gap: 6px;
+  font-size: 28px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.tile-hand {
+  padding: 4px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 55%);
+}
+
+.tile-reaction {
+  padding: 4px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 55%);
+}
+
+@media (max-width: 800px) {
+  .meetbar {
+    padding: 6px 12px;
   }
 }
