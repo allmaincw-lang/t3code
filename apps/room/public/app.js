@@ -1,4 +1,4 @@
-import { createDictation } from "./voice.js";
+import { createDictation, createRoomVoice } from "./voice.js";
 
 const $ = (id) => document.getElementById(id);
 const TOKEN_KEY = "room-token";
@@ -433,14 +433,16 @@ const startTalking = () => {
   active.start();
 };
 
-const dictation = token
-  ? createDictation({ token, input: $("message-input"), button: $("talk"), notify })
+const voice = token ? createRoomVoice({ token }) : null;
+const dictation = voice
+  ? createDictation({ voice, input: $("message-input"), button: $("talk"), notify })
   : null;
+window.roomVoice = voice;
 let localVoice = false;
 $("talk").hidden = !SpeechRecognizer;
-dictation?.available().then((available) => {
-  localVoice = available;
-  $("talk").hidden = !(available || SpeechRecognizer);
+voice?.ready.then(() => {
+  localVoice = voice.source === "local";
+  $("talk").hidden = !(localVoice || SpeechRecognizer);
 });
 $("talk").addEventListener("click", () => {
   if (localVoice) dictation.toggle();

@@ -67,34 +67,81 @@ const upload = async (token, pcm) => {
   return result.text;
 };
 
-/** `available()` says whether the room can transcribe locally; `toggle()` starts or ends a recording. */
-export const createDictation = ({ token, input, button, notify }) => {
+/**
+ * The stable speech API, also published as `window.roomVoice` by app.js.
+ * `ready` resolves once `source` is known: "local" (T3's engine through this room) or "browser"
+ * (not set up, so use the browser's own recognition). `start()` and `stop()` work only for "local".
+ * `state` is "idle", "recording" or "transcribing". `stop()` resolves with the text, "" if no
+ * speech, and rejects with a readable Error. `cancel()` discards a recording or pending result.
+ * `onstatechange` is called with the new state.
+ */
+export const createRoomVoice = ({ token }) => {
   const supported = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
   let session = null;
-  let transcribing = false;
   let generation = 0;
-
-  const show = (label, pressed = false) => {
-    button.textContent = label;
-    button.setAttribute("aria-pressed", String(pressed));
-    button.disabled = transcribing;
+  const api = {
+    source: "browser",
+    state: "idle",
+    onstatechange: null,
+    ready: null,
+    start: async () => {
+      if (api.source !== "local") throw new Error("Local speech is not available.");
+      if (api.state !== "idle") throw new Error("Already recording.");
+      try {
+        session = await record(() => api.state === "recording" && api.stop().catch(() => {}));
+      } catch (error) {
+        throw new Error(RECORDING_ERRORS[error?.name] ?? error?.message ?? "Recording failed.");
+      }
+      setState("recording");
+    },
+    stop: async () => {
+      if (api.state !== "recording") throw new Error("Not recording.");
+      const active = session;
+      const mine = generation;
+      session = null;
+      setState("transcribing");
+      try {
+        const text = (await upload(token, await toPcm16k(await active.finish()))).trim();
+        return mine === generation ? text : "";
+      } finally {
+        if (mine === generation) setState("idle");
+      }
+    },
+    cancel: () => {
+      generation += 1;
+      session?.cancel();
+      session = null;
+      setState("idle");
+    },
   };
-
-  const fail = (error) => {
-    notify(RECORDING_ERRORS[error?.name] ?? error?.message ?? "Dictation stopped working.");
+  const setState = (state) => {
+    api.state = state;
+    api.onstatechange?.(state);
   };
-
-  const stop = async () => {
-    const active = session;
-    const mine = generation;
-    session = null;
-    transcribing = true;
-    show("Transcribing...");
-    notify("Transcribing on this computer...");
+  api.ready = (async () => {
+    if (!supported) return;
     try {
-      const pcm = await toPcm16k(await active.finish());
-      const text = (await upload(token, pcm)).trim();
-      if (mine !== generation) return;
+      const res = await fetch("./api/transcribe/status", {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (res.ok && (await res.json()).available === true) api.source = "local";
+    } catch {}
+  })();
+  return api;
+};
+
+/** Wires the voice API to the composer's Talk button and draft. */
+export const createDictation = ({ voice, input, button, notify }) => {
+  voice.onstatechange = (state) => {
+    button.textContent = { idle: "Talk", recording: "Stop", transcribing: "Transcribing..." }[state];
+    button.setAttribute("aria-pressed", String(state === "recording"));
+    button.disabled = state === "transcribing";
+    if (state === "recording") notify("Recording... press Stop when you're done.");
+    if (state === "transcribing") notify("Transcribing on this computer...");
+  };
+  const finish = async () => {
+    try {
+      const text = await voice.stop();
       if (text) {
         const draft = input.value.trim();
         input.value = draft === "" ? text : `${draft} ${text}`;
@@ -104,46 +151,20 @@ export const createDictation = ({ token, input, button, notify }) => {
         notify("I didn't catch any speech. Try again.");
       }
     } catch (error) {
-      if (mine === generation) fail(error);
-    } finally {
-      transcribing = false;
-      show("Talk");
+      notify(error.message);
     }
   };
-
-  const start = async () => {
-    notify(null);
-    try {
-      session = await record(() => session && stop());
-      show("Stop", true);
-      notify("Recording... press Stop when you're done.");
-    } catch (error) {
-      session = null;
-      fail(error);
-    }
-  };
-
   return {
-    available: async () => {
-      if (!supported) return false;
+    toggle: async () => {
+      if (voice.state === "recording") return finish();
+      if (voice.state !== "idle") return;
+      notify(null);
       try {
-        const res = await fetch("./api/transcribe/status", {
-          headers: { authorization: `Bearer ${token}` },
-        });
-        return res.ok && (await res.json()).available === true;
-      } catch {
-        return false;
+        await voice.start();
+      } catch (error) {
+        notify(error.message);
       }
     },
-    toggle: () => {
-      if (transcribing) return;
-      return session ? stop() : start();
-    },
-    cancel: () => {
-      generation += 1;
-      session?.cancel();
-      session = null;
-      if (!transcribing) show("Talk");
-    },
+    cancel: () => voice.cancel(),
   };
 };

@@ -66,6 +66,11 @@ mkdir -p ~/.connected-empire && (umask 077 && t3 auth session issue --scope orch
 ROOM_T3_URL=http://127.0.0.1:3773 ROOM_T3_VOICE_TOKEN_FILE=$HOME/.connected-empire/room-voice.token node src/server.ts
 ```
 
+Other scripts on the page can use `window.roomVoice` (see `createRoomVoice` in `public/voice.js`):
+`await roomVoice.ready`, check `roomVoice.source` is `"local"` (otherwise it is `"browser"` and
+`start()` rejects), then `await roomVoice.start()` and `const text = await roomVoice.stop()`. Also
+`state`, `cancel()` and `onstatechange`.
+
 `orchestration:operate` is the narrowest scope T3's transcribe endpoint accepts. The room reads the
 file on each request, so a new key takes effect without a restart. Recordings are limited to 5
 minutes and are never stored or logged.
