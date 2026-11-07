@@ -13,9 +13,12 @@ function init() {
   const KEY = "room-jarvis";
   const MAX_SPOKEN = 700;
   const MAX_HOLD_MS = 60_000;
-  const prefs = { agent: "", autoSend: false, speak: false, voice: "" };
+  const prefs = { agent: "", autoSend: false, speak: false, voices: {} };
+  // Starting voices per agent; the Voice picker changes the selected agent's voice on this device.
+  const AGENT_VOICES = { claude: "bm_george", codex: "af_heart" };
   try {
     Object.assign(prefs, JSON.parse(localStorage.getItem(KEY) ?? "{}"));
+    if (!prefs.voices || typeof prefs.voices !== "object") prefs.voices = {};
   } catch {}
   const save = () => {
     try {
@@ -70,7 +73,8 @@ function init() {
   const speak = checkbox("Speak the agent's reply out loud");
   const voiceRow = el("label", "jv-check");
   const voicePick = el("select", "jv-voice");
-  voiceRow.append(el("span", null, "Voice"), voicePick);
+  const voiceName = el("span", null, "Voice");
+  voiceRow.append(voiceName, voicePick);
   voiceRow.hidden = true;
   const gestures = checkbox("Camera gesture: cover the lens to start or stop talking");
   const memory = checkbox("Remember notes for this agent");
@@ -238,14 +242,19 @@ function init() {
     spokenNow.onerror = done;
     window.speechSynthesis.speak(spokenNow);
   };
-  const say = async (value) => {
+  let defaultVoice = "";
+  const voiceFor = (agent) => {
+    const key = (agent ?? "").toLowerCase();
+    return prefs.voices[key] || AGENT_VOICES[key] || defaultVoice || undefined;
+  };
+  const say = async (value, agent = prefs.agent) => {
     cancelSpeech();
     const words = spoken(value);
     const current = {};
     utterance = current;
     if (naturalVoice && app.speech) {
       try {
-        const url = URL.createObjectURL(await app.speech(words, prefs.voice || undefined));
+        const url = URL.createObjectURL(await app.speech(words, voiceFor(agent)));
         if (utterance !== current) {
           URL.revokeObjectURL(url);
           return;
@@ -451,6 +460,7 @@ function init() {
 
   select.addEventListener("change", () => {
     prefs.agent = select.value;
+    syncVoicePick();
     save();
     render();
   });
@@ -458,6 +468,11 @@ function init() {
     prefs.autoSend = auto.input.checked;
     save();
   });
+  const syncVoicePick = () => {
+    const wanted = voiceFor(prefs.agent);
+    if ([...voicePick.options].some((o) => o.value === wanted)) voicePick.value = wanted;
+    voiceName.textContent = prefs.agent ? `Voice for ${prefs.agent}` : "Voice";
+  };
   const VOICE_GROUPS = { af: "US woman", am: "US man", bf: "British woman", bm: "British man" };
   const voiceLabel = (id) => {
     const [group, name = id] = id.split("_");
@@ -476,11 +491,13 @@ function init() {
         return option;
       }),
     );
-    voicePick.value = english.includes(prefs.voice) ? prefs.voice : (fallback ?? english[0]);
+    defaultVoice = fallback ?? english[0];
+    syncVoicePick();
     voiceRow.hidden = false;
   });
   voicePick.addEventListener("change", () => {
-    prefs.voice = voicePick.value;
+    if (!prefs.agent) return;
+    prefs.voices[prefs.agent.toLowerCase()] = voicePick.value;
     save();
     if (prefs.speak) void say("This is how I will sound.");
   });
@@ -584,7 +601,7 @@ function init() {
         for (const name of mention(data.text)) awaiting.add(name);
       } else if (data.kind === "agent" && awaiting.delete(data.author.toLowerCase())) {
         hint = "";
-        if (prefs.speak && data.author.toLowerCase() === prefs.agent.toLowerCase()) void say(data.text);
+        if (prefs.speak && data.author.toLowerCase() === prefs.agent.toLowerCase()) void say(data.text, data.author);
       }
     }
     render();
