@@ -1,0 +1,40 @@
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: clamp(420px, calc(100dvh - 230px), 900px);
+}
+.board-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.board-bar .muted {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board-canvas {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+/* Keep iOS from zooming when a dialog field is focused. */
+.board-canvas .Modal input,
+.board-canvas .Dialog input,
+.board-canvas .layer-ui__wrapper input,
+.board-canvas .layer-ui__wrapper textarea {
+  font-size: 16px;
+}
+/* On phones the stage shares the screen with chat, so keep the board inside it. */
+@media (max-width: 800px) {
+  .board {
+    height: max(260px, calc(50dvh - 190px));
+  }
+}
