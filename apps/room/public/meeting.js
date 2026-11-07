@@ -184,3 +184,12 @@ $("approval-jump").addEventListener("click", () => {
 $("messages").addEventListener("scroll", clearUnread, { passive: true });
 document.addEventListener("visibilitychange", clearUnread);
 new MutationObserver(decorateTiles).observe($("grid"), { childList: true });
+
+// Small public API so other features can reach meeting actions without editing this file.
+window.roomMeeting = {
+  raiseHand: () => report("/api/meeting", { hand: true }),
+  lowerHand: () => report("/api/meeting", { hand: false }),
+  isHandRaised: () => Boolean(me()?.hand),
+  react: (emoji) => report("/api/react", { emoji }),
+  reactions: [...REACTIONS],
+};
