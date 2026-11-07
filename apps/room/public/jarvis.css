@@ -1,0 +1,193 @@
+.jarvis {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.jarvis:empty {
+  display: none;
+}
+
+.jv-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.jv-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.jv-label {
+  font-weight: 600;
+}
+
+.jv-chip {
+  padding: 1px 8px;
+  border: 1px solid var(--ok);
+  border-radius: 999px;
+  color: var(--ok);
+  font-size: 12px;
+}
+
+.jv-chip-camera {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+/* Static states only: the face changes with short transitions and is still when idle. */
+.jv-face {
+  --jv-color: var(--muted);
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 44px;
+}
+
+.jv-ring,
+.jv-core {
+  position: absolute;
+  border-radius: 50%;
+  transition:
+    transform 0.25s ease,
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.jv-ring {
+  inset: 0;
+  border: 3px solid var(--jv-color);
+}
+
+.jv-core {
+  inset: 14px;
+  background: var(--jv-color);
+}
+
+.jv-face[data-state="listening"] {
+  --jv-color: var(--danger);
+}
+
+.jv-face[data-state="listening"] .jv-ring {
+  transform: scale(1.12);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--danger) 25%, transparent);
+}
+
+.jv-face[data-state="thinking"] {
+  --jv-color: var(--accent);
+}
+
+.jv-face[data-state="thinking"] .jv-core {
+  transform: scale(0.6);
+}
+
+.jv-face[data-state="speaking"] {
+  --jv-color: var(--ok);
+}
+
+.jv-face[data-state="speaking"] .jv-ring {
+  transform: scale(1.12);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--ok) 25%, transparent);
+}
+
+.jv-face[data-state="speaking"] .jv-core {
+  transform: scale(1.25);
+}
+
+.jv-face[data-state="approval"] {
+  --jv-color: var(--warn);
+}
+
+.jv-face[data-state="approval"] .jv-core {
+  transform: scale(0.4);
+}
+
+.jv-row,
+.jv-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.jv-agent {
+  min-height: 34px;
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--tile);
+  color: var(--text);
+  font: inherit;
+}
+
+.jv-ptt {
+  flex: 1 1 140px;
+  min-height: 44px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.jv-ptt[aria-pressed="true"] {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.jv-ptt:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.jv-transcript {
+  flex: 1 1 100%;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--tile);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+
+.jv-settings {
+  margin-top: 10px;
+}
+
+.jv-settings summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.jv-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.jv-note {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.jv-video {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.agent-memory {
+  color: var(--ok);
+  font-size: 12px;
+}

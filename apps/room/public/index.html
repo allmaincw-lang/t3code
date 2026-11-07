@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Room</title>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="jarvis.css" />
   </head>
   <body>
     <main id="signed-out" class="signed-out">
@@ -27,6 +28,8 @@
 
       <section class="stage" aria-label="People and agents">
         <div id="notice" class="notice" hidden></div>
+        <!-- Jarvis: filled in by jarvis.js -->
+        <section id="jarvis" class="jarvis" aria-label="Talk to an agent"></section>
         <div id="grid" class="grid"></div>
       </section>
 
@@ -47,5 +50,6 @@
       </aside>
     </div>
     <script src="app.js" type="module"></script>
+    <script src="jarvis.js" type="module"></script>
   </body>
 </html>

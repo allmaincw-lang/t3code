@@ -32,6 +32,9 @@ const state = {
   renderedMessages: new Set(),
 };
 
+// Jarvis: the small surface jarvis.js builds on.
+window.roomApp = { state, api: (path, body) => api(path, body), notify: (text) => notify(text) };
+
 const call = {
   active: false,
   stream: null,
@@ -142,6 +145,8 @@ const agentTile = (agent) => {
     element("div", "agent-task", agent.task ?? ""),
     element("div", `agent-status status-${status}`, STATUS_LABELS[status] ?? status),
   );
+  // Jarvis: memory indicator.
+  if (agent.memoryOn) tile.append(element("div", "agent-memory", "Memory on"));
   tile.addEventListener("click", () => {
     const input = $("message-input");
     input.value = `@${agent.name} ${input.value}`;
@@ -358,6 +363,8 @@ const connect = async () => {
       if (line === "") continue;
       const event = JSON.parse(line);
       await handleEvent(event.type, event.data).catch((error) => console.error(error));
+      // Jarvis: let jarvis.js follow the same events.
+      window.dispatchEvent(new CustomEvent("room:event", { detail: event }));
     }
   }
 };

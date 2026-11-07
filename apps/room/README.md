@@ -68,3 +68,27 @@ internet.
 ```bash
 node --test src/room.test.ts
 ```
+
+## Jarvis extras (all opt-in)
+
+A panel above the tiles, built in `public/jarvis.js` and `public/jarvis.css`:
+
+- **Push-to-talk.** Pick an agent, hold the button or the space bar outside a text box, release, check
+  the transcript, and send. It uses `window.roomVoice` when present and the browser's speech
+  recognition otherwise. "Send what I say without asking" skips the check. The message is an
+  ordinary @mention, so the owner's approval still applies.
+- **Spoken replies.** Off by default. Uses the browser's own `speechSynthesis`, with a stop button.
+- **Face.** A ring that shows listening, thinking (the agent is working), needs approval, and speaking.
+  It only reads signals the Room already has and uses short transitions, so it is still when idle.
+- **Memory.** Add `"memory": {"dir": "/absolute/folder"}` to the connector config. The agent's owner
+  then gets a switch in the panel. While it is on, `remember: ...` messages from the owner append a
+  note to `<dir>/<room>/<project>.md` on the owner's machine, and a size-capped excerpt goes into that
+  agent's prompt as background. Nothing is written to a git repository unless `memory.allowInRepo` is
+  true.
+- **Camera gesture.** Covering the camera lens for about a second starts or stops push-to-talk. It
+  needs its own camera permission and never touches raise-hand. It is a brightness check, not hand
+  tracking, because hand-tracking libraries need WebAssembly, which the Room's content security
+  policy does not allow.
+
+Ideas come from the public descriptions of jaredrhod's Backtalk, AI Visualizer and AI Memory Vault.
+Those are AGPL-3.0 and CC-BY-SA-4.0, so no code or assets were copied.

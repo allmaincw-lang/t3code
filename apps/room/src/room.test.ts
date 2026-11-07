@@ -1,11 +1,20 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 
+import {
+  appendNote,
+  MAX_EXCERPT,
+  MAX_FILE,
+  MAX_NOTE,
+  memoryFile,
+  parseRemember,
+  readExcerpt,
+} from "./memory.ts";
 import { createRoomServer, invitePerson } from "./server.ts";
 
 let dataDir: string;
@@ -161,4 +170,91 @@ test("chat history survives a restart", async () => {
   controller.abort();
   restarted.closeAllConnections();
   await new Promise((resolve) => restarted.close(resolve));
+});
+
+test("memory is keyed by room and project so nothing leaks between them", () => {
+  const dir = mkdtempSync(join(tmpdir(), "room-memory-"));
+  try {
+    appendNote(dir, "Room A", "proj", "Chase", "alpha secret");
+    appendNote(dir, "Room B", "proj", "Chase", "beta secret");
+    appendNote(dir, "Room A", "other", "Chase", "gamma secret");
+    assert.match(readExcerpt(dir, "Room A", "proj"), /alpha/);
+    assert.doesNotMatch(readExcerpt(dir, "Room A", "proj"), /beta|gamma/);
+    assert.equal(readExcerpt(dir, "Room C", "proj"), "");
+    // Names that normalize alike still get separate files, and none can escape the folder.
+    assert.notEqual(memoryFile(dir, "A b", "p"), memoryFile(dir, "a-b", "p"));
+    assert.ok(memoryFile(dir, "../../etc", "../x").startsWith(dir));
+    assert.match(readFileSync(memoryFile(dir, "Room A", "proj"), "utf8"), /^---\nroom: "Room A"/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("memory notes and excerpts are size capped", () => {
+  const dir = mkdtempSync(join(tmpdir(), "room-memory-"));
+  try {
+    appendNote(dir, "r", "p", "Chase", `${"x".repeat(MAX_NOTE * 3)}\nsecond line`);
+    assert.ok(readFileSync(memoryFile(dir, "r", "p"), "utf8").split("\n").every((l) => l.length < MAX_NOTE + 60));
+    for (let i = 0; i < 20; i += 1) appendNote(dir, "r", "p", "Chase", `note ${i} ${"y".repeat(300)}`);
+    const excerpt = readExcerpt(dir, "r", "p");
+    assert.ok(excerpt.length <= MAX_EXCERPT);
+    assert.match(excerpt, /note 19/);
+    assert.doesNotMatch(excerpt, /note 0 /);
+    assert.throws(() => {
+      for (let i = 0; i < MAX_FILE / 100; i += 1) appendNote(dir, "r", "p", "Chase", "z".repeat(400));
+    }, /full/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("parseRemember only matches messages that start with remember:", () => {
+  assert.deepEqual(parseRemember("remember: use tabs"), { mentions: [], note: "use tabs" });
+  assert.deepEqual(parseRemember("@Codex @pi Remember:  ship Friday "), {
+    mentions: ["codex", "pi"],
+    note: "ship Friday",
+  });
+  assert.equal(parseRemember("please remember: x"), null);
+  assert.equal(parseRemember("remember me"), null);
+  assert.equal(parseRemember("remember:   "), null);
+});
+
+test("only the owner can turn memory on, and only on a machine that offers it", async () => {
+  const connector = await openEvents(owner, "?machine=MacM");
+  await connector.next("snapshot");
+  await post(owner, "/api/agents", { machine: "MacM", agents: [{ name: "memo", memory: true }, { name: "nomem" }] });
+  await connector.next("agent");
+  await connector.next("agent");
+  assert.equal((await post(guest, "/api/agents/memo/memory", { enabled: true })).status, 403);
+  assert.equal((await post(owner, "/api/agents/nomem/memory", { enabled: true })).status, 409);
+  assert.equal((await post(owner, "/api/agents/nope/memory", { enabled: true })).status, 404);
+
+  // Off by default: the owner's note is refused and nothing reaches the connector.
+  const stream = await openEvents(owner);
+  await stream.next("snapshot");
+  await post(owner, "/api/messages", { text: "remember: before enabling" });
+  await post(owner, "/api/messages", { text: "@memo remember: also too early" });
+  assert.equal((await stream.next("message")).text, "remember: before enabling");
+  assert.equal((await stream.next("message")).text, "@memo remember: also too early");
+  assert.match((await stream.next("message")).text, /Memory is off for memo/);
+
+  assert.equal((await post(owner, "/api/agents/memo/memory", { enabled: true })).status, 200);
+  const enabled = await connector.next("agent");
+  assert.equal(enabled.memoryOn, true);
+  assert.equal(enabled.memoryAvailable, true);
+
+  // A guest's note is plain chat: no memory write, and the mention still waits for approval.
+  await post(guest, "/api/messages", { text: "@memo remember: guest note" });
+  assert.equal((await connector.next("dispatch")).status, "pending");
+
+  await post(owner, "/api/messages", { text: "remember: prefers tabs" });
+  assert.deepEqual(await connector.next("remember"), { agent: "memo", by: "Chase", text: "prefers tabs" });
+  await post(owner, "/api/messages", { text: "@memo remember: second" });
+  assert.equal((await connector.next("remember")).text, "second");
+
+  // Re-registering the agent keeps the owner's choice.
+  await post(owner, "/api/agents", { machine: "MacM", agents: [{ name: "memo", memory: true }] });
+  assert.equal((await connector.next("agent")).memoryOn, true);
+  assert.equal((await post(owner, "/api/agents/memo/memory", { enabled: false })).status, 200);
+  assert.equal((await connector.next("agent")).memoryOn, false);
 });
