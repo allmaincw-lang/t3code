@@ -1,3 +1,5 @@
+import { joinLiveKitCall } from "./livekit-call.js";
+
 const $ = (id) => document.getElementById(id);
 const TOKEN_KEY = "room-token";
 const STATUS_LABELS = {
@@ -34,6 +36,7 @@ const state = {
 
 const call = {
   active: false,
+  lk: null,
   stream: null,
   screenTrack: null,
   placeholderTimer: null,
@@ -158,6 +161,18 @@ const renderGrid = () => {
     tiles.push({ key: `${conn.id}:${stream?.id ?? "none"}`, build: () => personTile(`${conn.id}:${stream?.id ?? "none"}`, conn.person, stream ?? null, isLocal) });
   }
   const grid = $("grid");
+  if (call.lk) {
+    // LiveKit draws everyone who is in the call; people who are not in it keep a plain tile.
+    const outside = state.connections.filter((conn) => !conn.inCall);
+    const nodes = [
+      ...call.lk.tiles(),
+      ...outside.map((conn) => personTile(`${conn.id}:none`, conn.person, null, false)),
+      ...[...state.agents.values()].map(agentTile),
+    ];
+    grid.replaceChildren(...nodes);
+    $("status").textContent = `${state.connections.length} here, ${[...state.agents.values()].filter((a) => a.online).length} agents online`;
+    return;
+  }
   const existing = new Map([...grid.children].filter((n) => n.dataset.key).map((n) => [n.dataset.key, n]));
   const nodes = tiles.map(({ key, build }) => existing.get(key) ?? build());
   for (const agent of state.agents.values()) nodes.push(agentTile(agent));
@@ -249,7 +264,33 @@ const setCallControls = () => {
   }
 };
 
+const joinLiveKit = async () => {
+  let credentials;
+  try {
+    credentials = await api("/api/livekit/token", {});
+  } catch {
+    return false;
+  }
+  try {
+    const lk = await joinLiveKitCall({ ...credentials, onChange: renderGrid, notify });
+    call.lk = lk;
+    lk.onDisconnected(() => {
+      if (call.lk === lk) leaveCall().catch(() => {});
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const joinCall = async () => {
+  if (await joinLiveKit()) {
+    call.active = true;
+    setCallControls();
+    await api("/api/call", { connectionId: state.connectionId, inCall: true });
+    renderGrid();
+    return;
+  }
   try {
     call.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     notify(null);
@@ -281,11 +322,18 @@ const stopScreenShare = async () => {
 };
 
 const leaveCall = async () => {
+  const lk = call.lk;
+  call.lk = null;
+  await lk?.leave();
   await stopScreenShare();
   clearInterval(call.placeholderTimer);
   for (const track of call.stream?.getTracks() ?? []) track.stop();
   for (const id of [...call.peers.keys()]) dropPeer(id);
   call.stream = null;
+  for (const [id, label] of [["toggle-mic", "Mute"], ["toggle-camera", "Stop camera"], ["share-screen", "Share screen"]]) {
+    $(id).textContent = label;
+    $(id).setAttribute("aria-pressed", "false");
+  }
   call.active = false;
   setCallControls();
   notify(null);
@@ -330,7 +378,7 @@ const handleEvent = async (type, data) => {
       if (!data.some((conn) => conn.id === id && conn.inCall)) dropPeer(id);
     }
     renderGrid();
-    if (call.active) await connectToCallers();
+    if (call.active && !call.lk) await connectToCallers();
   } else if (type === "signal") {
     await handleSignal(data);
   }
@@ -464,13 +512,32 @@ $("join-call").addEventListener("click", () => {
 $("leave-call").addEventListener("click", () => {
   leaveCall().catch((error) => notify(error.message));
 });
+const toggleLiveKit = async (id, toggle, isOn, onLabel, offLabel) => {
+  await toggle();
+  $(id).textContent = isOn() ? onLabel : offLabel;
+  $(id).setAttribute("aria-pressed", String(!isOn()));
+};
+
 $("toggle-mic").addEventListener("click", () => {
+  if (call.lk) {
+    toggleLiveKit("toggle-mic", call.lk.toggleMic, call.lk.micOn, "Mute", "Unmute");
+    return;
+  }
   toggleTrack($("toggle-mic"), call.stream.getAudioTracks(), "Mute", "Unmute");
 });
 $("toggle-camera").addEventListener("click", () => {
+  if (call.lk) {
+    toggleLiveKit("toggle-camera", call.lk.toggleCamera, call.lk.cameraOn, "Stop camera", "Start camera");
+    return;
+  }
   toggleTrack($("toggle-camera"), call.stream.getVideoTracks(), "Stop camera", "Start camera");
 });
 $("share-screen").addEventListener("click", async () => {
+  if (call.lk) {
+    await toggleLiveKit("share-screen", call.lk.toggleScreen, call.lk.screenOn, "Stop sharing", "Share screen");
+    $("share-screen").setAttribute("aria-pressed", String(call.lk.screenOn()));
+    return;
+  }
   if (call.screenTrack) {
     await stopScreenShare();
     return;
