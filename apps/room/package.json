@@ -1,0 +1,16 @@
+{
+  "name": "@t3tools/room",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A shared room where people and T3 Code agents chat and see each other.",
+  "scripts": {
+    "start": "node src/server.ts",
+    "connector": "node src/connector.ts",
+    "invite": "node src/server.ts invite",
+    "test:room": "node --test src/room.test.ts"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -823,6 +823,8 @@ importers:
         specifier: 4.3.3
         version: 4.3.3
 
+  apps/room: {}
+
   apps/server:
     dependencies:
       '@anthropic-ai/claude-agent-sdk':

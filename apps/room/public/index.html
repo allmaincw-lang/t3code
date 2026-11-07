@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Room</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main id="signed-out" class="signed-out" hidden>
+      <h1>Room</h1>
+      <p>Open your invite link to join. Ask the room's host to create one for you.</p>
+    </main>
+
+    <div id="app" class="app" hidden>
+      <header class="topbar">
+        <strong>Room</strong>
+        <span id="status" class="muted" role="status"></span>
+        <div class="controls">
+          <button id="join-call" class="primary">Join call</button>
+          <button id="toggle-mic" hidden aria-pressed="false">Mute</button>
+          <button id="toggle-camera" hidden aria-pressed="false">Stop camera</button>
+          <button id="share-screen" hidden aria-pressed="false">Share screen</button>
+          <button id="leave-call" class="danger" hidden>Leave</button>
+        </div>
+      </header>
+
+      <section class="stage" aria-label="People and agents">
+        <div id="notice" class="notice" hidden></div>
+        <div id="grid" class="grid"></div>
+      </section>
+
+      <aside class="chat" aria-label="Room chat">
+        <div id="messages" class="messages" aria-live="polite"></div>
+        <div id="approvals" class="approvals"></div>
+        <form id="composer" class="composer">
+          <label class="sr-only" for="message-input">Message the room</label>
+          <textarea
+            id="message-input"
+            rows="2"
+            maxlength="8000"
+            placeholder="Message the room. Type @name to ask an agent."
+          ></textarea>
+          <button class="primary" type="submit">Send</button>
+        </form>
+      </aside>
+    </div>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
