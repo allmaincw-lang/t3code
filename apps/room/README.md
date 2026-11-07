@@ -58,11 +58,13 @@ The Talk button records in the browser and sends the audio to the room, which ha
 speech engine (the Handy models), so it never goes to Apple or Google. Without this setup Talk falls
 back to the browser's built-in recognition. T3 must be running with a speech model downloaded.
 
-On the machine that runs T3 and the room, create a key that can only run speech, then point the room
-at it. It is saved owner-readable only, and the key is never printed:
+On the machine that runs T3 and the room, create a T3 key, then point the room at it. It is saved
+owner-readable only, and the key is never printed. The key is not limited to speech: T3's
+transcribe endpoint requires `orchestration:operate`, which can also start agent threads, so keep the
+file private and revoke the key in T3's Sharing & access settings if it leaks.
 
 ```bash
-mkdir -p ~/.connected-empire && (umask 077 && t3 auth session issue --scope orchestration:operate --label "Room voice" --ttl 365d --token-only > ~/.connected-empire/room-voice.token)
+mkdir -p ~/.connected-empire && (umask 077 && t3 auth session issue --scope orchestration:operate --label "Room voice" --ttl 30d --token-only > ~/.connected-empire/room-voice.token)
 ROOM_T3_URL=http://127.0.0.1:3773 ROOM_T3_VOICE_TOKEN_FILE=$HOME/.connected-empire/room-voice.token node src/server.ts
 ```
 
