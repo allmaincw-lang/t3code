@@ -294,6 +294,12 @@ button[aria-pressed="true"] {
   background: var(--bg);
   color: var(--text);
   font: inherit;
+  /* iOS Safari zooms the page when focusing a field smaller than 16px. */
+  font-size: 16px;
+}
+
+.composer button {
+  flex: none;
 }
 
 @media (max-width: 800px) {
