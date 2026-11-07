@@ -1,0 +1,4 @@
+// Change this to something unique to you before installing on a device
+// (free personal teams cannot reuse a bundle id another team has taken).
+// The extension becomes <this>.broadcast and the app group group.<this>.
+ROOM_APP_BUNDLE_ID = com.connectedempire.room
