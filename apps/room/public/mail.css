@@ -1,0 +1,134 @@
+.mail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 760px;
+  min-width: 0;
+}
+
+.mail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.mail-head strong {
+  margin-right: auto;
+  overflow-wrap: anywhere;
+}
+
+.mail-h {
+  margin: 12px 0 0;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.mail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mail-chip {
+  min-height: 44px;
+}
+
+.mail-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mail-row {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  min-width: 0;
+}
+
+.mail-link {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.mail-meta {
+  font-size: 13px;
+}
+
+.mail-files {
+  margin-top: 4px;
+  font: 12px ui-monospace, monospace;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+
+.mail-link-out {
+  color: var(--accent);
+}
+
+.mail-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mail-message {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  min-width: 0;
+}
+
+.mail-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.mail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mail-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* 16px stops iOS Safari zooming in when a field gets focus. */
+.mail-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--tile);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
+.mail-error {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+
+.mail button.primary {
+  min-height: 44px;
+}
