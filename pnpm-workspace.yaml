@@ -1,5 +1,6 @@
 packages:
   - apps/*
+  - "!apps/room-bot"
   - evals
   - infra/*
   - oxlint-plugin-t3code
